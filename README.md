@@ -29,9 +29,14 @@
 ![Сборки](docs/screenshots/instances.jpg)
 ![Версии](docs/screenshots/versions.jpg)
 
-## Друзья и настройки
+## Каталог Modrinth
 
-![Друзья](docs/screenshots/friends.jpg)
+![Моды](docs/screenshots/mods.jpg)
+![Модпаки](docs/screenshots/modpacks.jpg)
+![Ресурспаки](docs/screenshots/resourcepacks.jpg)
+
+## Настройки
+
 ![Настройки](docs/screenshots/settings.jpg)
 
 ## Запуск

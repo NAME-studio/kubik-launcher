@@ -312,7 +312,20 @@ function createWindow() {
       for (const route of routes) {
         try {
           await mainWindow.webContents.executeJavaScript(`location.hash = '#${route}'`);
-          await new Promise((resolve) => setTimeout(resolve, 3200));
+          const deadline = Date.now() + 20000;
+          while (Date.now() < deadline) {
+            const ready = await mainWindow.webContents.executeJavaScript(`(() => {
+              const page = document.getElementById('page');
+              if (!page) return false;
+              if (page.querySelector('.skeleton')) return false;
+              const text = page.textContent || '';
+              if (/Загружаю|Ищу скин|Подождите/.test(text)) return false;
+              return page.querySelectorAll('.mod-card, .skin-tile, .inst-card, .list-row, .card, .server-card').length > 0;
+            })()`);
+            if (ready) break;
+            await new Promise((resolve) => setTimeout(resolve, 400));
+          }
+          await new Promise((resolve) => setTimeout(resolve, 900));
           const image = await mainWindow.webContents.capturePage();
           fs.writeFileSync(path.join(dir, `shot-${route}.png`), image.toPNG());
           console.log('[shot]', route);
