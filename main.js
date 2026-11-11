@@ -220,9 +220,10 @@ function showWindow() {
 }
 
 function createWindow() {
+  const shotSize = /^[0-9]+x[0-9]+$/.test(process.env.KUBIK_WINDOW || '') ? process.env.KUBIK_WINDOW.split('x').map(Number) : null;
   mainWindow = new BrowserWindow({
-    width: 1360,
-    height: 860,
+    width: shotSize ? shotSize[0] : 1360,
+    height: shotSize ? shotSize[1] : 860,
     minWidth: 1080,
     minHeight: 700,
     show: false,
@@ -325,7 +326,7 @@ function createWindow() {
             if (ready) break;
             await new Promise((resolve) => setTimeout(resolve, 400));
           }
-          await new Promise((resolve) => setTimeout(resolve, 900));
+          await new Promise((resolve) => setTimeout(resolve, 2600));
           const image = await mainWindow.webContents.capturePage();
           fs.writeFileSync(path.join(dir, `shot-${route}.png`), image.toPNG());
           console.log('[shot]', route);
