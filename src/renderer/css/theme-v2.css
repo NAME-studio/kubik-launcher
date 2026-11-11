@@ -1180,3 +1180,24 @@ html[data-theme="light"] .skin-tile .skin-figure {
 .editor-side .palette-label {
   margin-top: 0;
 }
+
+/* Редактор скина: карточки по высоте содержимого, холст без пустых полей */
+.skins-layout {
+  align-items: start;
+}
+
+.editor-card .canvas-wrap {
+  min-height: 0;
+  padding: 10px;
+}
+
+/* Правая колонка скинов: редактор и вкладки каталога вместе */
+.skins-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.skins-main .skin-tabs {
+  margin-top: 14px;
+}

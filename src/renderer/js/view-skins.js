@@ -892,8 +892,8 @@ window.Views.skins = (() => {
         tabsBar.append(button);
       }
 
-      container.append(UI.el('div', { class: 'skins-layout' }, left, editorCard));
-      container.append(tabsBar, tabHost);
+      const rightColumn = UI.el('div', { class: 'skins-main' }, editorCard, tabsBar, tabHost);
+      container.append(UI.el('div', { class: 'skins-layout' }, left, rightColumn));
       setTab(activeTab);
 
       editor = new window.SkinEditor({
