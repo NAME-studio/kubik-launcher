@@ -123,16 +123,24 @@ window.Views.home = (() => {
       if (!App.requireAccount('Выберите аккаунт, чтобы играть')) return;
       playButton.disabled = true;
       setProgress({ percent: 1, detail: 'Проверяю файлы игры…' });
+      const offProgress = App.on('progress', (payload) => {
+        if (!payload || payload.instanceId !== instance.id) return;
+        setProgress(payload);
+      });
       try {
         const result = await UI.req(window.api.game.launch(instance.id));
         App.state.running[instance.id] = true;
         UI.toast('Игра запускается…', 'success');
         refs.logFile = result.logFile;
         refreshPlayButton();
+        setProgress({ percent: 100, detail: 'Игра запущена' });
+        setTimeout(() => setProgress(null), 2500);
       } catch (error) {
-        UI.toast(error.message, 'error', 7000);
+        UI.toast(error.message, 'error', 9000);
         setProgress(null);
         playButton.disabled = false;
+      } finally {
+        offProgress();
       }
     }
 

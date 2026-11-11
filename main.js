@@ -8,6 +8,12 @@ const os = require('os');
 app.setName('Kubik Launcher');
 app.setAppUserModelId('com.kubik.launcher');
 
+const START_AT = Date.now();
+function markTiming(name) {
+  if (process.env.KUBIK_TIMING) console.log('[timing]', name, Date.now() - START_AT);
+}
+markTiming('module-loaded');
+
 const APP_DATA = app.getPath('appData');
 const USER_DATA = path.join(APP_DATA, '.KubikLauncher');
 const LEGACY_DIRS = [path.join(APP_DATA, 'KubikLauncher'), path.join(APP_DATA, '.kubic-launcher')];
@@ -244,6 +250,7 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'src', 'renderer', 'index.html'));
 
   mainWindow.once('ready-to-show', () => {
+    markTiming('ready-to-show');
     const settings = store.getSettings();
     const hidden = process.argv.includes('--hidden') && settings.startInTray !== false;
     if (!hidden) mainWindow.show();
@@ -722,7 +729,9 @@ function registerIpc() {
 }
 
 app.whenReady().then(() => {
+  markTiming('ready');
   migrateLegacyLayout();
+  markTiming('migrated');
   store.load();
   if (!store.getSettings().launchHideMigrated) {
     store.saveSettings({ closeOnLaunch: false, minimizeOnLaunch: true, launchHideMigrated: true });
@@ -731,8 +740,10 @@ app.whenReady().then(() => {
     store.saveSettings({ root: '' });
   }
   initRoot();
+  markTiming('root');
   registerIpc();
   createWindow();
+  markTiming('window-created');
   createTray();
   rpc.start();
   friends.startSync(mainWindow, () => {

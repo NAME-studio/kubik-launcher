@@ -15,7 +15,7 @@ function download(url, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
-      { family: 4, timeout: 15000, headers: { 'User-Agent': 'KubikLauncher/1.1 (skins)', ...extraHeaders } },
+      { family: 4, timeout: 45000, headers: { 'User-Agent': 'KubikLauncher/1.1.3 (skins)', ...extraHeaders } },
       (response) => {
         if (response.statusCode !== 200) {
           response.resume();
@@ -122,9 +122,16 @@ async function browse({ page = 1, size = 30 } = {}) {
   const key = `${pageNumber}:${pageSize}`;
   if (catalogCache.has(key)) return catalogCache.get(key);
 
-  const raw = await download(`https://api.mineskin.org/get/list?size=${pageSize}&page=${pageNumber}`, {
-    Accept: 'application/json',
-  });
+  const listUrl = `https://api.mineskin.org/get/list/${pageNumber}?size=${pageSize}`;
+  let raw = null;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      raw = await download(listUrl, { Accept: 'application/json' });
+      break;
+    } catch (error) {
+      if (attempt === 2) throw new Error(`Каталог недоступен: ${error.message}`);
+    }
+  }
   let payload = null;
   try {
     payload = JSON.parse(raw.toString('utf8'));
@@ -150,9 +157,12 @@ async function browse({ page = 1, size = 30 } = {}) {
     await Promise.all(list.slice(index, index + 5).map(worker));
   }
 
+  const index = payload.page && payload.page.index ? payload.page.index : pageNumber;
+  const pages = payload.page && payload.page.amount ? payload.page.amount : 0;
   const result = {
-    page: pageNumber,
-    total: payload.page ? payload.page.amount : items.length,
+    page: index,
+    total: 0,
+    hasMore: pages ? index < pages : items.length > 0,
     items,
   };
   catalogCache.set(key, result);

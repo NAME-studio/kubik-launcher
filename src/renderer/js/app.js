@@ -77,12 +77,14 @@
     } catch (error) {
       UI.toast(`Не удалось загрузить сборки: ${error.message}`, 'error');
     }
+    if (App.updateStatus) App.updateStatus();
     return App.state.instances;
   };
 
   App.currentView = () => App.views[App.state.route];
 
   App.refresh = () => {
+    if (App.updateStatus) App.updateStatus();
     renderPage();
   };
 
@@ -191,19 +193,45 @@
   App.launchInstance = async (instance) => {
     if (!instance) return;
     if (!App.requireAccount('Выберите аккаунт, чтобы играть')) return;
-    try {
-      if (App.state.running[instance.id]) {
+    if (App.state.running[instance.id]) {
+      try {
         await UI.req(window.api.game.stop(instance.id));
         App.state.running[instance.id] = false;
         UI.toast('Игра остановлена', 'info');
         App.refresh();
-        return;
+      } catch (error) {
+        UI.toast(error.message, 'error');
       }
+      return;
+    }
+    const bar = UI.el('div', { class: 'progress' }, UI.el('i', { style: { width: '1%' } }));
+    const label = UI.el('div', { class: 'progress-label' }, UI.el('span', { text: 'Проверяю файлы игры…' }), UI.el('span', { text: '1%' }));
+    const modal = UI.modal({
+      title: 'Запуск игры',
+      subtitle: 'Проверяю библиотеки, ресурсы и Java — окно можно свернуть',
+      body: UI.el('div', { class: 'stack', style: { gap: '10px' } }, bar, label),
+      actions: [],
+    });
+    const offProgress = App.on('progress', (payload) => {
+      if (!payload || payload.instanceId !== instance.id) return;
+      const percent = Math.max(0, Math.min(100, payload.percent || 0));
+      bar.querySelector('i').style.width = `${percent}%`;
+      label.firstChild.textContent = payload.detail || 'Подготовка…';
+      label.lastChild.textContent = `${percent}%`;
+    });
+    try {
       await UI.req(window.api.game.launch(instance.id));
       App.state.running[instance.id] = true;
+      bar.querySelector('i').style.width = '100%';
+      label.firstChild.textContent = 'Игра запущена';
+      label.lastChild.textContent = '100%';
       UI.toast('Игра запускается…', 'success');
+      setTimeout(() => modal.close(), 1200);
     } catch (error) {
-      UI.toast(error.message, 'error', 8000);
+      modal.close();
+      UI.toast(error.message, 'error', 9000);
+    } finally {
+      offProgress();
     }
     App.refresh();
   };
@@ -602,6 +630,27 @@
 
   App.refreshAccount = reloadAccounts;
 
+  function updateStatus() {
+    const host = document.getElementById('tb-status');
+    if (!host) return;
+    const runningId = Object.keys(App.state.running || {}).find((id) => App.state.running[id]);
+    const running = runningId ? (App.state.instances || []).find((item) => item.id === runningId) : null;
+    if (running) {
+      const loader = App.loaderLabel(running.loader);
+      host.textContent = `В игре: ${running.name} · Minecraft ${running.mcVersion}${loader ? ` · ${loader}` : ''}`;
+      host.classList.add('in-game');
+      return;
+    }
+    const current = App.instance ? App.instance() : null;
+    const loader = current ? App.loaderLabel(current.loader) : '';
+    host.textContent = current
+      ? `В лаунчере · Minecraft ${current.mcVersion}${loader ? ` · ${loader}` : ''}`
+      : 'В лаунчере';
+    host.classList.remove('in-game');
+  }
+
+  App.updateStatus = updateStatus;
+
   function updateAccountCard() {
     const name = document.getElementById('account-name');
     const sub = document.getElementById('account-sub');
@@ -757,6 +806,7 @@
         }
         setTimeout(() => App.reloadInstances().then(() => App.refresh()), 600);
       }
+      updateStatus();
       App.emit('state', payload);
       const view = App.currentView();
       if (view && view.onEvent) view.onEvent('state', payload);
@@ -782,11 +832,19 @@
       App.state.currentAccount = (data.accounts.list || []).find((a) => a.id === data.accounts.current) || null;
       App.state.instances = await UI.req(window.api.instances.list());
       App.state.selectedInstanceId = App.state.settings.lastInstance || (App.state.instances[0] && App.state.instances[0].id) || null;
-      App.state.javaList = await UI.req(window.api.java.list()).catch(() => []);
+      UI.req(window.api.java.list())
+        .then((list) => {
+          App.state.javaList = list || [];
+        })
+        .catch(() => {
+          App.state.javaList = App.state.javaList || [];
+        });
       document.getElementById('tb-version').textContent = `v${App.state.info.version}`;
+      updateStatus();
       document.title = 'Kubik Launcher';
       updateAccountCard();
       renderPage();
+      window.__bootMs = Math.round(performance.now());
       if (App.state.settings.firstRun && window.Views.onboarding) {
         window.Views.onboarding.open(() => App.refresh());
       }

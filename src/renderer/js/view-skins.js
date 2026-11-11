@@ -475,11 +475,38 @@ window.Views.skins = (() => {
     );
   }
 
+  function skinFigure(dataUrl) {
+    const canvas = UI.el('canvas', { class: 'skin-figure' });
+    window.SkinRender.loadImage(dataUrl)
+      .then((image) => {
+        const texture = window.SkinRender.textureOf(image);
+        let slim = true;
+        try {
+          const alpha = texture.getContext('2d').getImageData(47, 20, 1, 12).data;
+          for (let i = 3; i < alpha.length; i += 4) {
+            if (alpha[i] > 8) {
+              slim = false;
+              break;
+            }
+          }
+        } catch {
+          slim = false;
+        }
+        window.SkinRender.drawCharacter(canvas, texture, {
+          model: slim ? 'slim' : 'classic',
+          view: 'front',
+          scale: 7,
+        });
+      })
+      .catch(() => {});
+    return canvas;
+  }
+
   function skinTile(dataUrl, title, buttons) {
     return UI.el(
       'div',
       { class: 'skin-tile' },
-      UI.el('img', { src: dataUrl, alt: '', loading: 'lazy' }),
+      skinFigure(dataUrl),
       title ? UI.el('div', { class: 'skin-tile-name', text: title }) : null,
       UI.el('div', { class: 'skin-tile-actions' }, buttons),
     );
@@ -532,21 +559,35 @@ window.Views.skins = (() => {
             ]),
           );
         }
-        done = !result.items.length || (result.total ? page * 24 >= result.total : result.items.length < 24);
+        done = !result.items.length || result.hasMore === false;
         status.textContent = done
-          ? `Показано ${grid.children.length}${total ? ` из ${UI.num(total)}` : ''} — это весь каталог.`
-          : `Показано ${grid.children.length}${total ? ` из ${UI.num(total)}` : ''} — прокрутите, чтобы подгрузить ещё.`;
+          ? `Показано ${grid.children.length} скинов — это весь каталог.`
+          : `Показано ${grid.children.length} скинов — прокрутите, чтобы подгрузить ещё.`;
       } catch (error) {
-        status.textContent = `Каталог недоступен: ${error.message}`;
+        done = false;
+        status.textContent = `Каталог недоступен: ${error.message} — прокрутите, чтобы попробовать снова`;
       } finally {
         loading = false;
+        requestAnimationFrame(() => followUp());
       }
     };
+
+    function followUp() {
+      if (done || loading) return;
+      const rect = sentinel.getBoundingClientRect();
+      const page = document.getElementById('page');
+      const bottom = page ? page.getBoundingClientRect().bottom : window.innerHeight;
+      if (rect.top < bottom + 200) load(true);
+    }
 
     if (typeof IntersectionObserver === 'function') {
       const observer = new IntersectionObserver(
         (entries) => {
-          if (entries.some((entry) => entry.isIntersecting)) load(true);
+          if (entries.some((entry) => entry.isIntersecting)) {
+            observer.disconnect();
+            observer.observe(sentinel);
+            load(true);
+          }
         },
         { root: document.getElementById('page'), rootMargin: '500px 0px' },
       );

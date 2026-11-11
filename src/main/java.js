@@ -139,8 +139,12 @@ async function ensureJava(requiredMajor, onProgress) {
       return { ...info, source: 'settings' };
     }
   }
-  const list = await listJava(true);
-  const found = suitable(list, requiredMajor);
+  let list = await listJava();
+  let found = suitable(list, requiredMajor);
+  if (!found) {
+    list = await listJava(true);
+    found = suitable(list, requiredMajor);
+  }
   if (found) return { ...found, source: 'system' };
 
   const major = requiredMajor && requiredMajor >= 9 ? requiredMajor : requiredMajor === 8 ? 8 : 17;

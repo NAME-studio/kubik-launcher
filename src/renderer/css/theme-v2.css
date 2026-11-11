@@ -1085,3 +1085,52 @@ html[data-theme="light"] body[data-route="skins"] .page-head h1 {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Плитка скина: собранный персонаж вместо развёртки */
+.skin-tile .skin-figure {
+  height: 132px;
+  width: auto;
+  align-self: center;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.35));
+}
+
+html[data-theme="light"] .skin-tile .skin-figure {
+  filter: drop-shadow(0 8px 14px rgba(23, 39, 63, 0.18));
+}
+
+/* Статус лаунчера в шапке */
+.tb-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 460px;
+  padding: 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tb-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted-2);
+  flex: none;
+}
+
+.tb-status.in-game {
+  color: var(--accent-text);
+  border-color: rgba(var(--accent-rgb), 0.45);
+}
+
+.tb-status.in-game::before {
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.8);
+}
