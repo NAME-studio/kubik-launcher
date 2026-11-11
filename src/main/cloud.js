@@ -44,7 +44,7 @@ function base() {
 function request(path, { method = 'GET', body } = {}) {
   if (Date.now() < blockedUntil) {
     const error = new Error(
-      `Firestore ограничил запросы (429). Лаунчер сам повторит через ${waitSeconds()} с — это суточный лимит бесплатного тарифа.`,
+      `Firestore ограничил запросы (429): сработал лимит бесплатного тарифа. Повтор через ${waitSeconds()} с, суточная квота обнуляется утром по МСК.`,
     );
     error.status = 429;
     error.retryIn = waitSeconds();

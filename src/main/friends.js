@@ -118,8 +118,9 @@ async function send({ friendId, text, kind, payload }) {
   if (!configured()) throw new Error('Друзья не настроены');
   const body = String(text || '').slice(0, 4000);
   if (!body && !kind) throw new Error('Пустое сообщение');
+  const chatId = pairId(myId(), friendId);
   const doc = await cloud.createDoc('messages', {
-    pair: pairId(myId(), friendId),
+    pair: chatId,
     from: myId(),
     to: friendId,
     at: Date.now(),
@@ -127,6 +128,15 @@ async function send({ friendId, text, kind, payload }) {
     kind: kind || 'text',
     payload: payload || null,
   });
+  cloud
+    .patchDoc('chats', chatId, {
+      members: [myId(), friendId],
+      lastFrom: myId(),
+      lastText: body.slice(0, 140),
+      lastKind: kind || 'text',
+      lastAt: (doc && doc.at) || Date.now(),
+    })
+    .catch(() => {});
   return doc;
 }
 
@@ -342,12 +352,13 @@ async function state() {
 
     const ids = list.map((friend) => friend.id).filter(Boolean);
     const docs = ids.length ? await cloud.batchGet('users', ids) : {};
-    const recent = await recentMessages();
+    const chats = ids.length ? await cloud.batchGet('chats', ids.map((id) => pairId(myId(), id))).catch(() => ({})) : {};
     const friends = [];
     for (const friend of list) {
       const doc = docs[friend.id] || null;
-      const messages = recent.get(pairId(myId(), friend.id)) || [];
+      const chat = chats[pairId(myId(), friend.id)] || null;
       const lastRead = readMap[friend.id] || 0;
+      const lastMessage = chat && chat.lastAt ? { from: chat.lastFrom, text: chat.lastText, kind: chat.lastKind, at: chat.lastAt } : null;
       friends.push({
         id: friend.id,
         name: (doc && doc.name) || friend.name,
@@ -356,8 +367,8 @@ async function state() {
         online: doc ? Date.now() - (doc.updated || 0) < ONLINE_MS : false,
         updated: doc ? doc.updated : 0,
         status: (doc && doc.status) || { state: 'offline' },
-        unread: messages.filter((message) => message.from === friend.id && (message.at || 0) > lastRead).length,
-        lastMessage: messages.length ? messages[messages.length - 1] : null,
+        unread: chat && chat.lastFrom === friend.id && (chat.lastAt || 0) > lastRead ? 1 : 0,
+        lastMessage,
       });
     }
     friends.sort((a, b) => Number(b.online) - Number(a.online) || (b.updated || 0) - (a.updated || 0));
@@ -378,7 +389,7 @@ async function state() {
     };
     const blocked = cloud.blockedSeconds ? cloud.blockedSeconds() : 0;
     if (blocked > 0) {
-      data.warning = `Firestore временно ограничил запросы (суточный лимит). Повтор через ${blocked} с.`;
+      data.warning = `Firestore ограничил запросы (429): сработал лимит бесплатного тарифа. Повтор через ${blocked} с, суточная квота обнуляется утром по МСК.`;
       data.retryIn = blocked;
     }
     stateCache = { at: Date.now(), data };
@@ -395,25 +406,6 @@ async function state() {
       retryIn: error.retryIn || (cloud.blockedSeconds ? cloud.blockedSeconds() : 0),
     };
   }
-}
-
-async function recentMessages() {
-  if (messageCache.data && Date.now() - messageCache.at < 8000) return messageCache.data;
-  const me = myId();
-  const [incoming, outgoing] = await Promise.all([
-    cloud.query('messages', { where: [{ field: 'to', op: 'EQUAL', value: me }], limit: 200 }).catch(() => []),
-    cloud.query('messages', { where: [{ field: 'from', op: 'EQUAL', value: me }], limit: 100 }).catch(() => []),
-  ]);
-  const map = new Map();
-  for (const message of [...incoming, ...outgoing]) {
-    if (!message.pair) continue;
-    const bucket = map.get(message.pair) || [];
-    bucket.push(message);
-    map.set(message.pair, bucket);
-  }
-  for (const bucket of map.values()) bucket.sort((a, b) => (a.at || 0) - (b.at || 0));
-  messageCache = { at: Date.now(), data: map };
-  return map;
 }
 
 function markRead({ friendId }) {
@@ -576,7 +568,6 @@ async function ensureSharedInstances() {
 
 let cachedSummary = { configured: false, unread: 0, online: 0, friends: [] };
 let stateCache = { at: 0, data: null };
-let messageCache = { at: 0, data: null };
 let beatTimer = null;
 let syncTimer = null;
 
@@ -626,6 +617,7 @@ function startSync(window, getStatus) {
   beat();
   beatTimer = setInterval(beat, 60000);
   const tick = async () => {
+    if (window && !window.isDestroyed() && typeof window.isVisible === 'function' && !window.isVisible()) return;
     await refreshSummary();
     if (window && !window.isDestroyed()) window.webContents.send('friends:update', cachedSummary);
   };

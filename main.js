@@ -255,6 +255,9 @@ function createWindow() {
     const hidden = process.argv.includes('--hidden') && settings.startInTray !== false;
     if (!hidden) mainWindow.show();
     updater.init(mainWindow);
+    setTimeout(() => {
+      updater.promptOnStart(mainWindow).catch(() => {});
+    }, 2500);
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

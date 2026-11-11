@@ -4,16 +4,10 @@ window.Views = window.Views || {};
 
 window.Views.skins = (() => {
   const PALETTE = [
-    ['#ffffff', '#d9d9d9', '#b3b3b3', '#8c8c8c', '#666666', '#404040', '#262626', '#0f0f0f'],
-    ['#f8d8b0', '#e8bd91', '#cf9f71', '#b07f52', '#8c6039', '#6a4526', '#4a2e18', '#2c1a0d'],
-    ['#ffd8a8', '#ffbf7a', '#ff9f52', '#f07b3a', '#c9562a', '#9c3a1c', '#6f2611', '#45160a'],
-    ['#ffe066', '#ffc93c', '#f5a623', '#d98618', '#a86412', '#7a460d', '#4d2b08', '#261403'],
-    ['#d8f5a2', '#b2e061', '#8cc63f', '#6aa329', '#4d7c1a', '#34540f', '#203609', '#101d04'],
-    ['#8ce86a', '#54cc57', '#2faf58', '#1d8f52', '#146b44', '#0d4a32', '#082e21', '#04150f'],
-    ['#a8e6ff', '#6fd0f5', '#3ab1e0', '#2489b8', '#1a668c', '#124763', '#0a2e42', '#041720'],
-    ['#8fa8ff', '#667df0', '#4a58d6', '#363fae', '#252b82', '#181c59', '#0e1038', '#050618'],
-    ['#d0b3ff', '#ab8bf0', '#8a63d6', '#6845ab', '#4a2f80', '#301e56', '#1c1033', '#0a0515'],
-    ['#ffb3d1', '#ff8ab6', '#f5639a', '#d1417a', '#a32a5c', '#751a40', '#4a0f27', '#210612'],
+    ['#ffffff', '#d9d9d9', '#a6a6a6', '#6e6e6e', '#3d3d3d', '#141414'],
+    ['#f6d7b0', '#e3b98f', '#c99a6c', '#a97a4f', '#855c37', '#5e3f25'],
+    ['#ffd166', '#e4572e', '#b3261e', '#8ce86a', '#2a9d8f', '#10423d'],
+    ['#a5d8ff', '#2f6fed', '#14286b', '#e5c6ff', '#7b3fe4', '#2a175d'],
   ];
 
   let editor = null;
@@ -153,7 +147,7 @@ window.Views.skins = (() => {
           editor.setColor(color);
           colorInput.value = color;
           colorPreview.style.background = color;
-          colorCode.textContent = color;
+          colorCode.value = color;
           [...host.children].forEach((node) => node.classList.remove('active'));
           swatch.classList.add('active');
         });
@@ -216,14 +210,33 @@ window.Views.skins = (() => {
     const canvas = UI.el('canvas', { id: 'skin-canvas' });
     const colorInput = UI.el('input', { type: 'color', value: window.accentColor ? window.accentColor() : '#8ce86a' });
     const colorPreview = UI.el('div', { class: 'color-preview', style: { background: window.accentColor ? window.accentColor() : '#8ce86a' } });
-    const colorCode = UI.el('code', { text: window.accentColor ? window.accentColor() : '#8ce86a' });
+    const colorCode = UI.el('input', {
+      class: 'input sm hex',
+      value: window.accentColor ? window.accentColor() : '#8ce86a',
+      maxlength: '7',
+      spellcheck: 'false',
+      title: 'Свой цвет: HEX',
+    });
 
     const palette = UI.el('div', { class: 'palette' });
 
     colorInput.addEventListener('input', () => {
       editor.setColor(colorInput.value);
       colorPreview.style.background = colorInput.value;
-      colorCode.textContent = colorInput.value;
+      colorCode.value = colorInput.value;
+    });
+
+    colorCode.addEventListener('change', () => {
+      const raw = String(colorCode.value || '').trim().replace(/^#/, '');
+      if (!/^[0-9a-fA-F]{6}$/.test(raw)) {
+        colorCode.value = colorInput.value;
+        return;
+      }
+      const value = `#${raw.toLowerCase()}`;
+      colorInput.value = value;
+      colorCode.value = value;
+      colorPreview.style.background = value;
+      editor.setColor(value);
     });
 
     const tools = [
@@ -323,7 +336,7 @@ window.Views.skins = (() => {
         'div',
         { class: 'color-current' },
         colorPreview,
-        UI.el('div', { class: 'grow' }, UI.el('div', { class: 'tiny muted', text: 'текущий цвет' }), colorCode),
+        UI.el('div', { class: 'grow' }, UI.el('div', { class: 'tiny muted', text: 'свой цвет (HEX)' }), colorCode),
         colorInput,
       ),
       UI.el('div', { class: 'palette-label' }, 'Палитра'),
@@ -895,8 +908,8 @@ window.Views.skins = (() => {
         if (input) input.value = color;
         const box = editorCard.querySelector('.color-preview');
         if (box) box.style.background = color;
-        const code = editorCard.querySelector('.color-current code');
-        if (code) code.textContent = color;
+        const code = editorCard.querySelector('.color-current .hex');
+        if (code) code.value = color;
       };
 
       refs.viewer = window.Skin3D.create(preview, {

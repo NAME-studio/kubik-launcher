@@ -1134,3 +1134,49 @@ html[data-theme="light"] .skin-tile .skin-figure {
   background: var(--accent);
   box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.8);
 }
+
+/* Палитра редактора скинов: 36 цветов и поле своего HEX */
+.palette {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.palette .swatch {
+  min-height: 24px;
+  border-radius: 7px;
+}
+
+.color-current .hex {
+  width: 88px;
+  height: 32px;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* Компактная палитра: 24 цвета, свотчи в строку, без больших отступов */
+.palette {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.palette .swatch {
+  aspect-ratio: auto;
+  height: 20px;
+  min-height: 0;
+  border-radius: 6px;
+}
+
+/* Плотнее правая панель редактора скинов */
+.editor-side {
+  gap: 9px;
+}
+
+.editor-side .divider {
+  margin: 3px 0;
+}
+
+.editor-side .palette-label {
+  margin-top: 0;
+}

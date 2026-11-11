@@ -1,4 +1,5 @@
-const { app } = require('electron');
+const { app, dialog } = require('electron');
+const store = require('./store');
 
 let autoUpdater = null;
 let sender = null;
@@ -72,12 +73,7 @@ function init(window) {
   if (window) sender = window.webContents;
   if (initialized || !state.supported) return state;
   initialized = true;
-  const updater = load();
-  if (updater) {
-    setTimeout(() => {
-      check().catch(() => {});
-    }, 4000);
-  }
+  load();
   return state;
 }
 
@@ -123,4 +119,84 @@ function install() {
   return true;
 }
 
-module.exports = { init, getState, check, download, install };
+function waitDownloaded(timeout = 300000) {
+  if (state.status === 'ready') return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if (state.status === 'ready') {
+        clearInterval(timer);
+        resolve(true);
+        return;
+      }
+      if (state.status === 'error' || Date.now() - started > timeout) {
+        clearInterval(timer);
+        resolve(false);
+      }
+    }, 500);
+  });
+}
+
+function ask(window, options) {
+  return window && !window.isDestroyed()
+    ? dialog.showMessageBox(window, options)
+    : dialog.showMessageBox(options);
+}
+
+async function promptOnStart(window) {
+  if (!state.supported) return false;
+  try {
+    await check();
+  } catch {
+    return false;
+  }
+  if (state.status !== 'available' || !state.available) return false;
+
+  const settings = store.getSettings();
+  const seen = (settings.updatePromptSeen && settings.updatePromptSeen[state.available]) || 0;
+  if (Date.now() - seen < 24 * 60 * 60 * 1000) return false;
+  store.saveSettings({
+    updatePromptSeen: { ...(settings.updatePromptSeen || {}), [state.available]: Date.now() },
+  });
+
+  const answer = await ask(window, {
+    type: 'info',
+    title: 'Доступно обновление',
+    message: `Kubik Launcher ${state.available}`,
+    detail: `Сейчас установлена версия ${app.getVersion()}. Скачать и установить обновление сейчас?`,
+    buttons: ['Обновить', 'Позже'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  });
+  if (answer.response !== 0) return false;
+
+  await download();
+  const ready = await waitDownloaded();
+  if (!ready) {
+    await ask(window, {
+      type: 'warning',
+      title: 'Обновление не скачалось',
+      message: state.error || 'Не удалось скачать обновление',
+      detail: 'Можно повторить позже в настройках.',
+      buttons: ['Понятно'],
+      noLink: true,
+    });
+    return false;
+  }
+
+  const restart = await ask(window, {
+    type: 'info',
+    title: 'Обновление готово',
+    message: 'Перезапустить лаунчер сейчас?',
+    detail: 'Обновление установится при перезапуске.',
+    buttons: ['Перезапустить', 'Позже'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  });
+  if (restart.response === 0) install();
+  return true;
+}
+
+module.exports = { init, getState, check, download, install, promptOnStart };
