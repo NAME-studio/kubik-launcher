@@ -8,7 +8,6 @@ const net = require('./net');
 const { ensureDir, exists } = require('./util');
 
 const API = 'https://api.curseforge.com/v1';
-const BUNDLED_KEY = '$2a$10$7O/7ziWt7MN1afTBwhsbY.N58yyTiRqCSAHhoi3b9UkwAk/93OGLG';
 const GAME_ID = 432;
 const CLASS_IDS = { mod: 6, modpack: 4471, resourcepack: 12, shader: 6552, datapack: 17 };
 const LOADER_IDS = { forge: 1, fabric: 4, quilt: 5, neoforge: 6 };
@@ -20,8 +19,7 @@ function safeName(name) {
 }
 
 function apiKey() {
-  const custom = String(store.getSettings().curseforgeKey || '').trim();
-  return custom || BUNDLED_KEY;
+  return String(store.getSettings().curseforgeKey || '').trim();
 }
 
 function hasKey() {

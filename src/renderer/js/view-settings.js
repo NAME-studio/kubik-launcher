@@ -202,6 +202,31 @@ window.Views.settings = (() => {
     return card;
   }
 
+  function cloudCard() {
+    const card = UI.el('div', { class: 'card pad' });
+    card.append(UI.el('div', { class: 'card-head' }, UI.el('div', { class: 'card-title' }, UI.icon('users'), 'Облако друзей')));
+    const project = UI.el('input', {
+      class: 'input',
+      placeholder: 'projectId, например kubik-launcher',
+      value: App.state.settings.firebaseProjectId || '',
+      onchange: (event) => save({ firebaseProjectId: event.target.value.trim() }),
+    });
+    const key = UI.el('input', {
+      class: 'input',
+      placeholder: 'apiKey из конфига Firebase',
+      value: App.state.settings.firebaseApiKey || '',
+      onchange: (event) => save({ firebaseApiKey: event.target.value.trim() }),
+    });
+    card.append(
+      UI.el('div', { class: 'setting-block' },
+        UI.el('div', { class: 'field' }, UI.el('label', {}, 'Project ID'), project),
+        UI.el('div', { class: 'field' }, UI.el('label', {}, 'API key'), key),
+        UI.el('p', { class: 'tiny muted' }, 'Друзья и общие сборки работают через Firebase. Ключи хранятся только на этом ПК, в исходный код не вшиваются. Взять их: console.firebase.google.com → Project settings → Your apps → Web app.'),
+      ),
+    );
+    return card;
+  }
+
   function discordCard() {
     const card = UI.el('div', { class: 'card pad' });
     card.append(UI.el('div', { class: 'card-head' }, UI.el('div', { class: 'card-title' }, UI.icon('users'), 'Discord')));
@@ -538,6 +563,7 @@ window.Views.settings = (() => {
         updateCard(),
         javaCard(),
         appearanceCard(),
+        cloudCard(),
         discordCard(),
       );
       container.append(cols, UI.el('div', { class: 'settings-about' }, about));

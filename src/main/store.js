@@ -43,8 +43,8 @@ const DEFAULT_SETTINGS = {
   friendAbout: '',
   friendAvatar: '',
   friendBanner: '',
-  firebaseApiKey: 'AIzaSyDwtq429C-o8i2yONQIuXJs_XAwLY5EINY',
-  firebaseProjectId: 'kubik-launcher',
+  firebaseApiKey: '',
+  firebaseProjectId: '',
   curseforgeKey: '',
 };
 
