@@ -4,6 +4,21 @@
 
 ![Главная](docs/screenshots/home.jpg)
 
+## Скачать
+
+- Сайт: https://name-studio.github.io/kubik-launcher/
+- Релизы: https://github.com/NAME-studio/kubik-launcher/releases
+
+| Файл | Для чего |
+| --- | --- |
+| `KubikLauncher-Setup-<версия>.exe` | установщик для Windows 10/11 x64 |
+| `KubikLauncher-<версия>-portable.zip` | портативная версия: распаковать и запустить |
+| `SHA256SUMS.txt` | контрольные суммы для проверки загрузки |
+
+Установщик пока не подписан сертификатом, поэтому SmartScreen может показать «Windows защитила ваш компьютер»:
+нажмите «Подробнее» → «Выполнить в любом случае» или сверьте хеш командой
+`certutil -hashfile KubikLauncher-Setup-<версия>.exe SHA256` с `SHA256SUMS.txt`.
+
 ## Что умеет
 
 - **Профили.** У каждой сборки своя папка `instances/<id>/.minecraft`: моды, ресурспаки, шейдеры, миры, настройки и логи не пересекаются. Обложки, память, разрешение окна, Java и аргументы — отдельно на профиль.
