@@ -40,6 +40,7 @@ const DEFAULT_SETTINGS = {
   friendCode: '',
   friends: [],
   friendsRead: {},
+  pinnedFriends: [],
   friendAbout: '',
   friendAvatar: '',
   friendBanner: '',

@@ -134,6 +134,11 @@ contextBridge.exposeInMainWorld('api', {
     data: (nickname) => invoke('skins:data', { nickname }),
     openSite: () => invoke('skins:open-site'),
     save: (dataUrl, suggestedName) => invoke('skins:save', { dataUrl, suggestedName }),
+    fetchByNick: (nick) => invoke('skins:fetch', { nick }),
+    catalog: (options) => invoke('skins:catalog', options || {}),
+    gallery: () => invoke('skins:gallery'),
+    gallerySave: (dataUrl, name) => invoke('skins:gallery-save', { dataUrl, name }),
+    galleryRemove: (name) => invoke('skins:gallery-remove', { name }),
   },
 
   content: {

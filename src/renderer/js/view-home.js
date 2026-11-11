@@ -15,7 +15,6 @@ window.Views.home = (() => {
 
   function renderHero() {
     const instance = App.instance();
-    const cover = instance ? UI.coverFor(instance.cover) : 'assets/hero.jpg';
 
     const playButton = UI.el('button', { class: 'btn primary lg', id: 'home-play' }, UI.icon('play'), 'Играть');
     const secondary = UI.el(
@@ -34,8 +33,8 @@ window.Views.home = (() => {
 
     const hero = UI.el(
       'div',
-      { class: 'hero' },
-      UI.el('div', { class: 'hero-bg', style: { backgroundImage: `url("${cover}")` } }),
+      { class: 'hero hero-art' },
+      UI.el('div', { class: 'hero-bg' }),
       UI.el(
         'div',
         { class: 'hero-content' },
@@ -222,9 +221,9 @@ window.Views.home = (() => {
       return card;
     }
 
-    const avatar = UI.el('img', { alt: account.username });
+    const avatarBox = UI.el('div', { class: 'skin-mini' }, UI.icon('user'));
     card.append(
-      UI.el('div', { class: 'skin-mini' }, avatar),
+      avatarBox,
       UI.el(
         'div',
         { class: 'grow' },
@@ -235,8 +234,9 @@ window.Views.home = (() => {
       UI.el('button', { class: 'btn sm ghost', onclick: () => App.openAccount() }, 'Сменить'),
     );
     App.accountAvatar(account).then((url) => {
-      if (url) avatar.src = url;
-      else avatar.remove();
+      if (!url) return;
+      UI.clear(avatarBox);
+      avatarBox.append(UI.el('img', { src: url, alt: '' }));
     });
 
     return card;
@@ -284,12 +284,60 @@ window.Views.home = (() => {
     return grid;
   }
 
+  function renderVanilla() {
+    const select = UI.el('select', { class: 'select' });
+    select.append(UI.el('option', { value: '', text: 'Загружаю версии…' }));
+    const playBtn = UI.el('button', { class: 'btn primary', disabled: true }, UI.icon('play'), 'Играть');
+    const hint = UI.el('div', { class: 'tiny muted', text: 'Чистая ванила без сборки: выбираете версию и играете.' });
+    const card = UI.el('div', { class: 'card pad vanilla-quick' },
+      UI.el('div', { class: 'card-head' },
+        UI.el('div', { class: 'card-title' }, UI.icon('cube'), 'Играть без сборки'),
+        UI.el('span', { class: 'badge', text: 'ванила' }),
+      ),
+      UI.el('div', { class: 'vanilla-row' }, select, playBtn),
+      hint,
+    );
+
+    (async () => {
+      try {
+        const manifest = await UI.req(window.api.versions.manifest());
+        const releases = (manifest.versions || []).filter((version) => version.type === 'release');
+        UI.clear(select);
+        for (const version of releases.slice(0, 60)) select.append(UI.el('option', { value: version.id, text: version.id }));
+        if (!releases.length) {
+          select.append(UI.el('option', { value: '', text: 'Нет версий' }));
+          hint.textContent = 'Не удалось получить список версий Minecraft.';
+          return;
+        }
+        playBtn.disabled = false;
+      } catch (error) {
+        hint.textContent = `Список версий недоступен: ${error.message}`;
+      }
+    })();
+
+    playBtn.addEventListener('click', async () => {
+      const version = select.value;
+      if (!version) return;
+      playBtn.disabled = true;
+      const label = playBtn.lastChild;
+      if (label && label.nodeType === 3) label.textContent = ' Запускаю…';
+      try {
+        await App.quickPlay(version);
+      } finally {
+        if (label && label.nodeType === 3) label.textContent = ' Играть';
+        playBtn.disabled = false;
+      }
+    });
+
+    return card;
+  }
+
   return {
     title: 'Главная',
     kicker: 'Добро пожаловать в Kubik',
     render(container) {
       const stack = UI.el('div', { class: 'stack' });
-      stack.append(renderHero(), renderStats(), renderAccount());
+      stack.append(renderHero(), renderStats(), renderVanilla(), renderAccount());
       stack.append(
         UI.el(
           'div',

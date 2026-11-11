@@ -251,6 +251,242 @@ window.Views.skins = (() => {
     return { body, canvas, colorInput, colorPreview, colorCode };
   }
 
+  async function applySkinData(dataUrl) {
+    if (!editor) return;
+    try {
+      const image = await window.SkinRender.loadImage(dataUrl);
+      editor.loadImageElement(image, true);
+      updateModelButtons();
+      renderPreview();
+      setDirty(true);
+      UI.toast('Скин загружен в редактор — нажмите «Сохранить»', 'success', 6000);
+    } catch (error) {
+      UI.toast(error.message, 'error');
+    }
+  }
+
+  function catalogCard() {
+    const nick = UI.el('input', { class: 'input', placeholder: 'Ник игрока, например Notch' });
+    const findBtn = UI.el('button', { class: 'btn primary' }, UI.icon('search'), 'Найти');
+    const status = UI.el('div', { class: 'tiny muted', text: 'Скин подтягивается по нику игрока. Найденный скин можно сохранить в галерею и применить.' });
+    const found = UI.el('div', { class: 'skin-gallery' });
+    const saved = UI.el('div', { class: 'skin-gallery' });
+
+    const tile = (dataUrl, title, buttons) =>
+      UI.el(
+        'div',
+        { class: 'skin-tile' },
+        UI.el('img', { src: dataUrl, alt: '' }),
+        UI.el('div', { class: 'skin-tile-name', text: title }),
+        UI.el('div', { class: 'skin-tile-actions' }, buttons),
+      );
+
+    const paintGallery = async () => {
+      UI.clear(saved);
+      let items = [];
+      try {
+        items = await UI.req(window.api.skins.gallery());
+      } catch (error) {
+        saved.append(UI.el('div', { class: 'tiny muted', text: `Галерея недоступна: ${error.message}` }));
+        return;
+      }
+      if (!items.length) {
+        saved.append(UI.el('div', { class: 'tiny muted', text: 'Галерея пуста.' }));
+        return;
+      }
+      for (const item of items) {
+        saved.append(
+          tile(
+            item.dataUrl,
+            item.name,
+            [
+              UI.el('button', { class: 'btn sm', onclick: () => applySkinData(item.dataUrl) }, 'Применить'),
+              UI.el('button', {
+                class: 'btn sm ghost icon-only',
+                title: 'Удалить',
+                onclick: async () => {
+                  try {
+                    await UI.req(window.api.skins.galleryRemove(item.name));
+                    paintGallery();
+                    UI.toast('Удалено из галереи', 'info');
+                  } catch (error) {
+                    UI.toast(error.message, 'error');
+                  }
+                },
+              }, UI.icon('trash')),
+            ],
+          ),
+        );
+      }
+    };
+
+    const search = async () => {
+      const query = nick.value.trim();
+      if (!query) {
+        UI.toast('Введите ник игрока', 'info');
+        return;
+      }
+      findBtn.disabled = true;
+      status.textContent = `Ищу скин игрока ${query}…`;
+      try {
+        const result = await UI.req(window.api.skins.fetchByNick(query));
+        UI.clear(found);
+        found.append(
+          tile(result.dataUrl, result.nick, [
+            UI.el('button', { class: 'btn sm primary', onclick: () => applySkinData(result.dataUrl) }, 'Применить'),
+            UI.el('button', {
+              class: 'btn sm',
+              onclick: async () => {
+                try {
+                  await UI.req(window.api.skins.gallerySave(result.dataUrl, result.nick));
+                  await paintGallery();
+                  UI.toast('Скин сохранён в галерею', 'success');
+                } catch (error) {
+                  UI.toast(error.message, 'error');
+                }
+              },
+            }, 'В галерею'),
+          ]),
+        );
+        status.textContent = `Найден скин ${result.nick}.`;
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        findBtn.disabled = false;
+      }
+    };
+
+    findBtn.addEventListener('click', search);
+    nick.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') search();
+    });
+
+    paintGallery();
+
+    return UI.el(
+      'div',
+      { class: 'card pad', style: { marginTop: '16px' } },
+      UI.el('div', { class: 'card-head' },
+        UI.el('div', { class: 'card-title' }, UI.icon('grid'), 'Каталог скинов'),
+        UI.el('span', { class: 'badge', text: 'по нику' }),
+      ),
+      UI.el('div', { class: 'vanilla-row' }, nick, findBtn),
+      status,
+      found,
+      UI.el('div', { class: 'skin-sub', text: 'Моя галерея' }),
+      saved,
+    );
+  }
+
+  function catalogGrid() {
+    const grid = UI.el('div', { class: 'skin-gallery' });
+    const status = UI.el('div', { class: 'tiny muted', text: 'Загружаю каталог скинов…' });
+    const moreBtn = UI.el('button', { class: 'btn sm', disabled: true }, 'Показать ещё');
+    const refreshBtn = UI.el('button', { class: 'btn sm ghost icon-only', title: 'Обновить каталог', onclick: () => { page = 0; load(false); } }, UI.icon('refresh'));
+    const galleryHost = UI.el('div', { class: 'skin-gallery' });
+    let page = 0;
+    let loading = false;
+
+    const tile = (dataUrl, title, buttons) =>
+      UI.el(
+        'div',
+        { class: 'skin-tile' },
+        UI.el('img', { src: dataUrl, alt: '' }),
+        title ? UI.el('div', { class: 'skin-tile-name', text: title }) : null,
+        UI.el('div', { class: 'skin-tile-actions' }, buttons),
+      );
+
+    const paintGallery = async () => {
+      UI.clear(galleryHost);
+      let items = [];
+      try {
+        items = await UI.req(window.api.skins.gallery());
+      } catch (error) {
+        galleryHost.append(UI.el('div', { class: 'tiny muted', text: `Галерея недоступна: ${error.message}` }));
+        return;
+      }
+      if (!items.length) {
+        galleryHost.append(UI.el('div', { class: 'tiny muted', text: 'Галерея пуста.' }));
+        return;
+      }
+      for (const item of items) {
+        galleryHost.append(
+          tile(item.dataUrl, item.name, [
+            UI.el('button', { class: 'btn sm', onclick: () => applySkinData(item.dataUrl) }, 'Применить'),
+            UI.el('button', {
+              class: 'btn sm ghost icon-only',
+              title: 'Удалить',
+              onclick: async () => {
+                try {
+                  await UI.req(window.api.skins.galleryRemove(item.name));
+                  paintGallery();
+                } catch (error) {
+                  UI.toast(error.message, 'error');
+                }
+              },
+            }, UI.icon('trash')),
+          ]),
+        );
+      }
+    };
+
+    const load = async (next) => {
+      if (loading) return;
+      loading = true;
+      moreBtn.disabled = true;
+      status.textContent = next ? `Загружаю страницу ${page + 1}…` : 'Загружаю каталог скинов…';
+      try {
+        const result = await UI.req(window.api.skins.catalog({ page: next ? page + 1 : 1, size: 30 }));
+        if (!next) UI.clear(grid);
+        page = result.page || (next ? page + 1 : 1);
+        for (const item of result.items) {
+          grid.append(
+            tile(item.dataUrl, '', [
+              UI.el('button', { class: 'btn sm primary', onclick: () => applySkinData(item.dataUrl) }, 'Применить'),
+              UI.el('button', {
+                class: 'btn sm',
+                onclick: async () => {
+                  try {
+                    await UI.req(window.api.skins.gallerySave(item.dataUrl, `skin-${item.id}`));
+                    await paintGallery();
+                    UI.toast('Скин сохранён в галерею', 'success');
+                  } catch (error) {
+                    UI.toast(error.message, 'error');
+                  }
+                },
+              }, 'В галерею'),
+            ]),
+          );
+        }
+        status.textContent = result.items.length
+          ? `В каталоге ${UI.num(result.total || 0)} скинов, показано ${grid.children.length}.`
+          : 'Каталог пуст — нажмите «Обновить».';
+      } catch (error) {
+        status.textContent = `Каталог недоступен: ${error.message}`;
+      } finally {
+        loading = false;
+        moreBtn.disabled = false;
+      }
+    };
+
+    moreBtn.addEventListener('click', () => load(true));
+    paintGallery();
+    load(false);
+
+    return UI.el(
+      'div',
+      { class: 'card pad', style: { marginTop: '16px' } },
+      UI.el('div', { class: 'card-head' },
+        UI.el('div', { class: 'card-title' }, UI.icon('grid'), 'Каталог скинов'),
+        UI.el('div', { class: 'row', style: { gap: '8px' } }, refreshBtn, moreBtn),
+      ),
+      status,
+      grid,
+      UI.el('div', { class: 'skin-sub', text: 'Моя галерея' }),
+      galleryHost,
+    );
+  }
+
   return {
     title: 'Скины',
     kicker: 'Персонаж и скин',
@@ -418,6 +654,7 @@ window.Views.skins = (() => {
       );
 
       container.append(UI.el('div', { class: 'skins-layout' }, left, editorCard));
+      container.append(catalogGrid());
 
       editor = new window.SkinEditor({
         canvas,

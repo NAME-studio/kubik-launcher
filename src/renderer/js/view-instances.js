@@ -164,9 +164,9 @@ window.Views.instances = (() => {
 
     function renderCovers() {
       UI.clear(coverRow);
-      for (const cover of ['autumn', 'village', 'winter', 'snow', 'caves', 'desert']) {
+      for (const cover of UI.COVERS) {
         const button = UI.el('button', {
-          class: `chip${data.cover === cover ? ' active' : ''}`,
+          class: `chip${UI.coverKey(data.cover) === cover ? ' active' : ''}`,
           style: { padding: '3px 10px 3px 3px' },
         });
         button.append(UI.el('img', { src: UI.coverFor(cover), style: { width: '26px', height: '20px', objectFit: 'cover', borderRadius: '6px' } }));
@@ -180,7 +180,7 @@ window.Views.instances = (() => {
     }
 
     function coverName(cover) {
-      return { autumn: 'Осень', village: 'Деревня', winter: 'Зима', snow: 'Снежный край', caves: 'Пещеры', desert: 'Пустыня' }[cover] || cover;
+      return UI.coverNames[cover] || cover;
     }
 
     body.append(
@@ -437,8 +437,8 @@ window.Views.instances = (() => {
     const gameArea = UI.el('textarea', { class: 'textarea', placeholder: 'Дополнительные аргументы игры', value: data.gameArgs, oninput: (e) => (data.gameArgs = e.target.value) });
 
     const coverRow = UI.el('div', { class: 'chips' });
-    for (const cover of ['autumn', 'village', 'winter', 'snow', 'caves', 'desert']) {
-      const chip = UI.el('button', { class: `chip${data.cover === cover ? ' active' : ''}` });
+    for (const cover of UI.COVERS) {
+      const chip = UI.el('button', { class: `chip${UI.coverKey(data.cover) === cover ? ' active' : ''}`, title: UI.coverNames[cover] });
       chip.append(UI.el('img', { src: UI.coverFor(cover), style: { width: '26px', height: '20px', objectFit: 'cover', borderRadius: '6px' } }));
       chip.addEventListener('click', () => {
         data.cover = cover;
@@ -615,9 +615,9 @@ window.Views.instances = (() => {
         UI.el(
           'div',
           { class: 'inst-sub' },
-          App.loaderLabel(instance.loader) || 'Vanilla',
-          '•',
-          instance.lastPlayed ? `запуск ${UI.ago(instance.lastPlayed)}` : 'не запускался',
+          UI.el('span', { text: App.loaderLabel(instance.loader) || 'Vanilla' }),
+          UI.el('span', { class: 'dot', text: '•' }),
+          UI.el('span', { text: instance.lastPlayed ? `запуск ${UI.ago(instance.lastPlayed)}` : 'не запускался' }),
         ),
         UI.el(
           'div',

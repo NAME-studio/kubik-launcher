@@ -105,6 +105,7 @@
   function renderPage() {
     const route = (location.hash || '#home').replace('#', '');
     App.state.route = App.views[route] ? route : 'home';
+    document.body.dataset.route = App.state.route;
     const view = App.currentView();
     if (!view) return;
 
@@ -122,6 +123,8 @@
     const actions = document.getElementById('page-actions');
 
     UI.clear(page);
+    page.style.overflow = '';
+    page.style.paddingBottom = '';
     UI.clear(actions);
     head.textContent = typeof view.title === 'string' ? view.title : '';
     kicker.textContent = view.kicker || '';
@@ -225,6 +228,10 @@
     UI.req(window.api.game.install(instanceId))
       .then(() => {
         UI.toast('Игра установлена — можно играть', 'success');
+        if (options.autoLaunch) {
+          const target = options.instance || (App.state.instances || []).find((item) => item.id === instanceId);
+          if (target) setTimeout(() => App.launchInstance(target), 300);
+        }
       })
       .catch((error) => {
         UI.toast(error.message, 'error', 9000);
@@ -235,6 +242,42 @@
         App.refresh();
       });
     return modal;
+  };
+
+  const quickLocks = new Set();
+
+  App.quickPlay = async (version) => {
+    const mc = String(version || '').trim();
+    if (!mc) return null;
+    if (quickLocks.has(mc)) return null;
+    if (!App.requireAccount('Выберите аккаунт, чтобы играть')) return null;
+    quickLocks.add(mc);
+    try {
+      let instance = (App.state.instances || []).find(
+        (item) => item.mcVersion === mc && item.loader && item.loader.type === 'vanilla' && !item.sharedPack && !item.modpack,
+      );
+      if (!instance) {
+        const created = await UI.req(window.api.instances.create({
+          name: `Ванила ${mc}`,
+          mcVersion: mc,
+          loader: { type: 'vanilla', version: null },
+        }));
+        instance = created && created.instance ? created.instance : null;
+        if (instance) App.state.instances = [...(App.state.instances || []), instance];
+      }
+      if (!instance) {
+        await App.reloadInstances();
+        instance = (App.state.instances || []).find((item) => item.name === `Ванила ${mc}`);
+      }
+      if (!instance) throw new Error('Не удалось подготовить сборку');
+      App.installInstance(instance.id, { title: `Ванила ${mc}`, instance, autoLaunch: true });
+      return instance;
+    } catch (error) {
+      UI.toast(error.message, 'error', 8000);
+      return null;
+    } finally {
+      setTimeout(() => quickLocks.delete(mc), 1500);
+    }
   };
 
   const DEFAULT_SKIN = {
@@ -318,7 +361,7 @@
         UI.el('div', { class: 'account-row-name' }, account.username),
         UI.el('div', { class: 'tiny muted' }, AccountLabels[account.type] || account.type),
       ),
-      active ? UI.el('span', { class: 'badge accent', text: 'выбран' }) : null,
+      ...(active ? [UI.el('span', { class: 'badge accent', text: 'выбран' })] : []),
       UI.el('button', {
         class: 'btn sm ghost icon-only',
         title: 'Удалить аккаунт',
@@ -569,7 +612,7 @@
     if (account) {
       name.textContent = account.username;
       sub.textContent = AccountLabels[account.type] || 'аккаунт';
-      const img = UI.el('img', { alt: account.username });
+      const img = UI.el('img', { alt: '' });
       avatarHost.append(img);
       App.accountAvatar(account).then((url) => {
         if (url) img.src = url;
@@ -596,6 +639,11 @@
     });
 
     document.querySelectorAll('.nav-item').forEach((item) => {
+      const label = item.querySelector('span');
+      if (label && label.textContent.trim()) {
+        item.dataset.label = label.textContent.trim();
+        item.title = label.textContent.trim();
+      }
       item.addEventListener('click', () => App.go(item.dataset.route));
     });
 
@@ -728,6 +776,7 @@
       if (window.Effects) {
         window.Effects.setSoundEnabled(data.settings.sounds !== false);
         window.Effects.applyAccent(data.settings.accent || 'lime');
+        window.Effects.applyTheme(data.settings.theme || 'dark');
       }
       App.state.accounts = { current: data.accounts.current, list: data.accounts.list || [] };
       App.state.currentAccount = (data.accounts.list || []).find((a) => a.id === data.accounts.current) || null;

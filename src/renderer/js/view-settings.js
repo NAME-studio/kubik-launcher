@@ -243,7 +243,7 @@ window.Views.settings = (() => {
           status.style.color = '';
           status.textContent = 'Статус выключен переключателем ниже.';
         } else if (data.connected) {
-          status.style.color = 'var(--accent)';
+          status.style.color = 'var(--accent-text)';
           status.textContent = data.appliedAt
             ? 'Подключено, статус отправлен в Discord'
             : 'Подключено к Discord';
@@ -430,24 +430,76 @@ window.Views.settings = (() => {
     const card = UI.el('div', { class: 'card pad' });
     card.append(UI.el('div', { class: 'card-head' }, UI.el('div', { class: 'card-title' }, UI.icon('sparkles'), 'Оформление и звук')));
 
+    const accentValue = String(App.state.settings.accent || 'lime');
     const accentRow = UI.el('div', { class: 'accent-row' });
-    for (const name of ['lime', 'blue', 'violet', 'red', 'orange']) {
-      const chip = UI.el('button', {
-        class: `accent-chip${App.state.settings.accent === name ? ' active' : ''}`,
-        dataset: { accent: name },
-        title: name,
-        onclick: async () => {
-          await save({ accent: name });
-          window.Effects.applyAccent(name);
-          [...accentRow.children].forEach((node) => node.classList.toggle('active', node === chip));
-        },
-      });
-      accentRow.append(chip);
+    const hexInput = UI.el('input', {
+      class: 'input sm',
+      placeholder: '#7ee787',
+      value: accentValue.startsWith('#') ? accentValue : '',
+      maxlength: '7',
+    });
+    const preview = UI.el('span', { class: 'palette-preview', style: { background: window.accentColor() } });
+
+    const applyAccentValue = async (value) => {
+      const clean = String(value || '').trim().toLowerCase();
+      const isPreset = window.Effects.accentPresets().some((preset) => preset.name === clean);
+      const isHex = /^#?[0-9a-f]{6}$/.test(clean);
+      if (clean && !isPreset && !isHex) {
+        UI.toast('Цвет в формате #RRGGBB или пресет', 'error');
+        return;
+      }
+      const normalized = !clean ? 'lime' : isHex ? `#${clean.replace('#', '')}` : clean;
+      await save({ accent: normalized });
+      window.Effects.applyAccent(normalized);
+      [...accentRow.children].forEach((node) => node.classList.toggle('active', node.dataset.accent === normalized));
+      hexInput.value = normalized.startsWith('#') ? normalized : '';
+      preview.style.background = window.accentColor();
+    };
+
+    for (const preset of window.Effects.accentPresets()) {
+      accentRow.append(UI.el('button', {
+        class: `accent-chip${accentValue === preset.name ? ' active' : ''}`,
+        dataset: { accent: preset.name },
+        title: preset.name,
+        style: { background: `linear-gradient(135deg, ${preset.accent}, ${preset.accent2})` },
+        onclick: () => applyAccentValue(preset.name),
+      }));
     }
+
+    const customRow = UI.el('div', { class: 'palette-custom' },
+      preview,
+      UI.el('input', {
+        type: 'color',
+        class: 'palette-input',
+        value: accentValue.startsWith('#') ? accentValue : window.accentColor(),
+        oninput: (event) => {
+          hexInput.value = event.target.value;
+          preview.style.background = event.target.value;
+        },
+        onchange: (event) => applyAccentValue(event.target.value),
+      }),
+      hexInput,
+      UI.el('button', { class: 'btn sm', onclick: () => applyAccentValue(hexInput.value) }, 'Применить'),
+      UI.el('button', { class: 'btn sm ghost', onclick: () => applyAccentValue('lime') }, 'Сбросить'),
+    );
 
     card.append(
       UI.el('div', { class: 'setting-block' },
-        UI.el('div', { class: 'field' }, UI.el('label', {}, 'Акцентный цвет'), accentRow),
+        UI.el('div', { class: 'field' },
+          UI.el('label', {}, 'Тема'),
+          UI.el('div', { class: 'tabs mini' },
+            ...[['dark', 'Тёмная'], ['light', 'Светлая']].map(([id, label]) => {
+              const tab = UI.el('button', { class: `tab${(App.state.settings.theme || 'dark') === id ? ' active' : ''}`, text: label });
+              tab.addEventListener('click', async () => {
+                await save({ theme: id });
+                window.Effects.applyTheme(id);
+                [...tab.parentElement.children].forEach((node) => node.classList.toggle('active', node === tab));
+              });
+              return tab;
+            }),
+          ),
+        ),
+        UI.el('div', { class: 'field' }, UI.el('label', {}, 'Акцентный цвет'), accentRow, customRow),
         switchRow('Звуки интерфейса', 'Щелчки, успешное действие и ошибка', App.state.settings.sounds !== false, async (v) => {
           await save({ sounds: v });
           window.Effects.setSoundEnabled(v);

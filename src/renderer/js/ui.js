@@ -81,17 +81,36 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
 
-  UI.coverFor = (cover) => {
-    const legacy = {
-      meadow: 'autumn',
-      nether: 'caves',
-      end: 'desert',
-      mountains: 'winter',
-      ocean: 'snow',
-    };
-    const name = legacy[cover] || cover || 'autumn';
-    return `assets/cover-${name}.jpg`;
+  UI.COVERS = ['sakura', 'caves', 'autumn', 'glade', 'village', 'jungle'];
+
+  UI.coverNames = {
+    sakura: 'Сакура',
+    caves: 'Пещеры',
+    autumn: 'Осень',
+    glade: 'Поляна',
+    village: 'Деревня',
+    jungle: 'Джунгли',
   };
+
+  const coverAliases = {
+    meadow: 'glade',
+    forest: 'glade',
+    nether: 'caves',
+    winter: 'caves',
+    end: 'jungle',
+    mountains: 'autumn',
+    desert: 'autumn',
+    ocean: 'sakura',
+    snow: 'sakura',
+    spring: 'sakura',
+  };
+
+  UI.coverKey = (cover) => {
+    const key = coverAliases[cover] || cover;
+    return UI.COVERS.includes(key) ? key : 'autumn';
+  };
+
+  UI.coverFor = (cover) => `assets/cover-${UI.coverKey(cover)}.jpg`;
 
   UI.debounce = (fn, delay = 350) => {
     let timer = null;

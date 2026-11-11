@@ -11,7 +11,77 @@ window.Views.friends = (() => {
     heartbeat: null,
     refs: {},
     busy: false,
+    query: '',
   };
+
+  function clock(at) {
+    if (!at) return '';
+    const date = new Date(at);
+    const now = new Date();
+    const hm = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    if (date.toDateString() === now.toDateString()) return hm;
+    const yesterday = new Date(now.getTime() - 86400000);
+    if (date.toDateString() === yesterday.toDateString()) return 'вчера';
+    return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function dayLabel(at) {
+    const date = new Date(at || Date.now());
+    const now = new Date();
+    const yesterday = new Date(now.getTime() - 86400000);
+    if (date.toDateString() === now.toDateString()) return 'Сегодня';
+    if (date.toDateString() === yesterday.toDateString()) return 'Вчера';
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  }
+
+  function preview(friend) {
+    const message = friend.lastMessage;
+    if (!message) return '';
+    const mine = message.from !== friend.id;
+    let text = message.text || '';
+    if (message.kind === 'pack') text = `Сборка: ${(message.payload && message.payload.name) || ''}`;
+    else if (message.kind === 'invite') text = 'Приглашение в игру';
+    else if (message.kind === 'server') text = 'Сервер в игре';
+    const clean = String(text).replace(/\s+/g, ' ').trim().slice(0, 42);
+    return `${mine ? 'Вы: ' : ''}${clean}`;
+  }
+
+  function pinnedIds() {
+    const list = App.state.settings && App.state.settings.pinnedFriends;
+    return Array.isArray(list) ? list : [];
+  }
+
+  async function togglePin(friendId) {
+    const current = pinnedIds();
+    const next = current.includes(friendId) ? current.filter((id) => id !== friendId) : [friendId, ...current];
+    try {
+      const updated = await UI.req(window.api.settings.save({ pinnedFriends: next }));
+      Object.assign(App.state.settings, updated);
+      renderList();
+    } catch (error) {
+      UI.toast(error.message, 'error');
+    }
+  }
+
+  function sortedFriends() {
+    const list = (state.data && state.data.friends) || [];
+    const query = state.query.trim().toLowerCase();
+    const filtered = query
+      ? list.filter((friend) => String(friend.name || '').toLowerCase().includes(query))
+      : list.slice();
+    const pinned = pinnedIds();
+    return filtered.sort((a, b) => {
+      const pa = pinned.indexOf(a.id);
+      const pb = pinned.indexOf(b.id);
+      const sa = pa === -1 ? 999 : pa;
+      const sb = pb === -1 ? 999 : pb;
+      if (sa !== sb) return sa - sb;
+      const ta = (a.lastMessage && a.lastMessage.at) || 0;
+      const tb = (b.lastMessage && b.lastMessage.at) || 0;
+      if (tb !== ta) return tb - ta;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
+    });
+  }
 
   function statusText(friend) {
     if (!friend.online) return 'офлайн';
@@ -143,25 +213,51 @@ window.Views.friends = (() => {
 
   function friendRow(friend) {
     const active = friend.id === state.selected;
-    const row = UI.el('button', { class: `friend-row${active ? ' active' : ''}`, type: 'button' },
+    const pinned = pinnedIds().includes(friend.id);
+    const tail = preview(friend);
+    const pinBtn = UI.el('button', {
+      class: `friend-pin${pinned ? ' on' : ''}`,
+      type: 'button',
+      title: pinned ? 'Открепить' : 'Закрепить',
+      onclick: (event) => {
+        event.stopPropagation();
+        togglePin(friend.id);
+      },
+    }, UI.icon('star'));
+    const row = UI.el('div', { class: `friend-row${active ? ' active' : ''}`, role: 'button', tabindex: '0' },
       friend.avatar
         ? UI.el('span', { class: `friend-avatar image${friend.online ? ' online' : ''}` },
             UI.el('img', { src: friend.avatar, alt: '' }))
         : UI.el('span', { class: `friend-avatar${friend.online ? ' online' : ''}`, text: initials(friend.name) }),
       UI.el('div', { class: 'friend-text' },
         UI.el('div', { class: 'friend-name', text: friend.name }),
-        UI.el('div', { class: 'friend-status-line', text: statusText(friend) }),
+        UI.el('div', { class: `friend-status-line${tail ? '' : ' plain'}`, text: tail || statusText(friend) }),
       ),
-      friend.unread ? UI.el('span', { class: 'badge accent friend-unread', text: String(friend.unread) }) : null,
+      UI.el('div', { class: 'friend-meta' },
+        UI.el('div', { class: 'friend-time', text: clock(friend.lastMessage && friend.lastMessage.at) }),
+        friend.unread ? UI.el('span', { class: 'badge accent friend-unread', text: String(friend.unread) }) : null,
+      ),
+      pinBtn,
     );
-    row.addEventListener('click', async () => {
-      if (state.selected === friend.id) return;
+    const open = async () => {
+      if (state.selected === friend.id) {
+        state.refs.input && state.refs.input.focus();
+        return;
+      }
       state.selected = friend.id;
       state.messages = [];
       renderList();
       renderChat(true);
       await loadMessages();
       renderChat(true);
+      state.refs.input && state.refs.input.focus();
+    };
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        open();
+      }
     });
     return row;
   }
@@ -177,7 +273,14 @@ window.Views.friends = (() => {
       ));
       return;
     }
-    for (const friend of state.data.friends) host.append(friendRow(friend));
+    const rows = sortedFriends();
+    if (!rows.length) {
+      host.append(UI.el('div', { class: 'friends-empty' },
+        UI.el('p', { class: 'tiny muted' }, `Никого не нашли по запросу «${state.query.trim()}».`),
+      ));
+      return;
+    }
+    for (const friend of rows) host.append(friendRow(friend));
   }
 
   function packRow(pack) {
@@ -360,6 +463,9 @@ window.Views.friends = (() => {
       refs.status.className = `friend-status${friend && friend.online ? ' online' : ''}`;
     }
     if (!force && refs.chatFriend === state.selected) return;
+    const switched = refs.chatFriend !== state.selected;
+    const box = refs.messages;
+    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 48;
     refs.chatFriend = state.selected;
     UI.clear(refs.messages);
     if (!friend) {
@@ -370,11 +476,24 @@ window.Views.friends = (() => {
     if (!state.messages.length) {
       refs.messages.append(UI.el('div', { class: 'friends-empty' }, UI.el('p', { class: 'tiny muted' }, 'Сообщений пока нет — напишите первым.')));
     } else {
-      for (const message of state.messages) refs.messages.append(chatBubble(message, friend));
+      const ordered = state.messages.slice().sort((a, b) => (a.at || 0) - (b.at || 0));
+      let lastDay = '';
+      for (const message of ordered) {
+        const label = dayLabel(message.at);
+        if (label !== lastDay) {
+          lastDay = label;
+          refs.messages.append(UI.el('div', { class: 'chat-day' }, UI.el('span', { text: label })));
+        }
+        refs.messages.append(chatBubble(message, friend));
+      }
     }
-    requestAnimationFrame(() => {
-      if (refs.messages) refs.messages.scrollTop = refs.messages.scrollHeight;
-    });
+    if (switched || nearBottom) {
+      requestAnimationFrame(() => {
+        if (refs.messages) refs.messages.scrollTop = refs.messages.scrollHeight;
+      });
+    } else if (box) {
+      box.scrollTop = Math.min(box.scrollTop, box.scrollHeight);
+    }
   }
 
   async function sendMessage() {
@@ -406,12 +525,34 @@ window.Views.friends = (() => {
     const status = UI.el('div', { class: 'friend-status', text: '' });
     const input = UI.el('input', { class: 'input', placeholder: 'Сообщение…' });
     const sendBtn = UI.el('button', { class: 'btn primary icon-only', title: 'Отправить', onclick: () => sendMessage() }, UI.icon('send'));
+    const search = UI.el('input', {
+      class: 'input friends-search',
+      placeholder: 'Поиск по друзьям…',
+      value: state.query,
+    });
 
     input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') sendMessage();
     });
 
-    state.refs = { list, packs, messages, title, status, input };
+    search.addEventListener('input', () => {
+      state.query = search.value;
+      renderList();
+    });
+    search.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        search.value = '';
+        state.query = '';
+        renderList();
+        return;
+      }
+      if (event.key === 'Enter') {
+        const first = state.refs.list && state.refs.list.querySelector('.friend-row');
+        if (first) first.click();
+      }
+    });
+
+    state.refs = { list, packs, messages, title, status, input, search };
 
     const chat = UI.el('div', { class: 'card friends-chat' },
       UI.el('div', { class: 'friends-chat-head' },
@@ -434,6 +575,7 @@ window.Views.friends = (() => {
       ),
       meCard(),
       addFriendForm(),
+      search,
       list,
     );
 
@@ -447,7 +589,21 @@ window.Views.friends = (() => {
         UI.el('span', {}, 'Общая сборка одна у вас и у друга: кто добавит мод — он появится у обоих.')),
     );
 
-    return UI.el('div', { class: 'friends-layout' }, side, chat, packsCard);
+    const layout = UI.el('div', { class: 'friends-layout' }, side, chat, packsCard);
+    state.refs.layout = layout;
+    return layout;
+  }
+
+  function fitLayout() {
+    const layout = state.refs.layout;
+    if (!layout || !layout.isConnected) return;
+    const page = layout.closest('.page');
+    if (page) {
+      page.style.overflow = 'hidden';
+      page.style.paddingBottom = '14px';
+    }
+    const top = layout.getBoundingClientRect().top;
+    layout.style.height = `${Math.max(420, Math.round(window.innerHeight - top - 16))}px`;
   }
 
   function setupCard() {
@@ -736,6 +892,11 @@ window.Views.friends = (() => {
     renderList();
     renderPacks();
     renderChat(true);
+    requestAnimationFrame(() => requestAnimationFrame(fitLayout));
+    if (!state.resizeBound) {
+      state.resizeBound = true;
+      window.addEventListener('resize', () => fitLayout());
+    }
   }
 
   function createSharedDialog() {
@@ -906,6 +1067,11 @@ window.Views.friends = (() => {
     destroy() {
       clearInterval(state.timer);
       clearInterval(state.heartbeat);
+      const page = state.refs.layout && state.refs.layout.closest('.page');
+      if (page) {
+        page.style.overflow = '';
+        page.style.paddingBottom = '';
+      }
       state.refs = {};
     },
   };

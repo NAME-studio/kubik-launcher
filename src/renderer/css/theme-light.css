@@ -1,0 +1,228 @@
+/* Kubik Launcher — светлая тема */
+
+html[data-theme="light"] {
+  --bg: #f2f5fa;
+  --bg-2: #e9eef7;
+  --panel: #ffffff;
+  --panel-2: #f5f8fd;
+  --panel-3: #e8edf6;
+  --border: #d3dbe8;
+  --border-soft: #e2e8f2;
+  --text: #101823;
+  --muted: #566172;
+  --muted-2: #7b8698;
+  --shadow: 0 18px 46px rgba(24, 38, 61, 0.12);
+  --shadow-soft: 0 10px 26px rgba(24, 38, 61, 0.08);
+
+  --glass: rgba(255, 255, 255, 0.9);
+  --hover: rgba(24, 38, 61, 0.05);
+  --hover-2: rgba(24, 38, 61, 0.07);
+  --hover-3: rgba(24, 38, 61, 0.1);
+  --tint: rgba(24, 38, 61, 0.06);
+  --tint-soft: rgba(24, 38, 61, 0.03);
+  --tint-mid: rgba(24, 38, 61, 0.045);
+  --border-strong: rgba(24, 38, 61, 0.22);
+  --overlay: rgba(255, 255, 255, 0.72);
+  --surface-tile: #eef3fb;
+  --surface-tile-2: #dde5f0;
+  --surface-bar: #e2e8f2;
+  --surface-ing: #eef2f8;
+  --surface-code: #f2f5fa;
+  --stage-a: #ffffff;
+  --stage-b: #eef2f9;
+  --checker-a: #eef2f8;
+  --checker-b: #e4eaf3;
+
+  --accent-text: color-mix(in srgb, var(--accent) 55%, #101823);
+  --accent-2-text: color-mix(in srgb, var(--accent-2) 55%, #101823);
+  --notice-text: #14506f;
+  --switch-off: #d8e0ec;
+  --switch-knob: #ffffff;
+}
+
+html[data-theme="light"] body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+html[data-theme="light"] body::before {
+  opacity: 0.35;
+}
+
+html[data-theme="light"] .sidebar,
+html[data-theme="light"] .topbar,
+html[data-theme="light"] .titlebar {
+  background: var(--glass);
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .tb-btn.danger:hover {
+  background: #e05252;
+  color: #fff;
+}
+
+html[data-theme="light"] .card,
+html[data-theme="light"] .modal,
+html[data-theme="light"] .inst-card,
+html[data-theme="light"] .mod-card,
+html[data-theme="light"] .friend-pack,
+html[data-theme="light"] .friends-me,
+html[data-theme="light"] .friends-side,
+html[data-theme="light"] .friends-chat,
+html[data-theme="light"] .friends-packs-card {
+  background: var(--panel);
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .card {
+  background: linear-gradient(180deg, #ffffff, #f8fafd);
+}
+
+html[data-theme="light"] .stat {
+  background: linear-gradient(160deg, #ffffff, #eef2f9);
+}
+
+html[data-theme="light"] .modal {
+  background: linear-gradient(180deg, #ffffff, #f5f8fd);
+  box-shadow: 0 24px 60px rgba(24, 38, 61, 0.18);
+}
+
+html[data-theme="light"] .nav-item.active {
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--text);
+}
+
+html[data-theme="light"] .chat-bubble {
+  background: #f3f6fc;
+  border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .chat-bubble.mine {
+  background: rgba(var(--accent-rgb), 0.14);
+  border-color: rgba(var(--accent-rgb), 0.3);
+}
+
+html[data-theme="light"] .chat-day span {
+  background: var(--panel-2);
+  border-color: var(--border-soft);
+  color: var(--muted);
+}
+
+html[data-theme="light"] .badge.accent {
+  color: #186b34;
+}
+
+html[data-theme="light"] .btn.primary {
+  color: #08120a;
+}
+
+html[data-theme="light"] .notice {
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+html[data-theme="light"] .friend-code {
+  color: #14713a;
+}
+
+html[data-theme="light"] .skeleton {
+  background: linear-gradient(100deg, #eef2f8 30%, #f8fafd 50%, #eef2f8 70%);
+}
+
+html[data-theme="light"] .project-body,
+html[data-theme="light"] .modal-body {
+  color: var(--text);
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(24, 38, 61, 0.22);
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(24, 38, 61, 0.38);
+}
+
+/* Hero on the home screen: artwork fades into a light panel */
+html[data-theme="light"] .hero {
+  background: linear-gradient(135deg, #ffffff 0%, #eef4fc 100%);
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .hero-bg {
+  opacity: 0.34;
+  filter: saturate(0.9);
+}
+
+html[data-theme="light"] .hero-bg::after {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.97) 6%, rgba(255, 255, 255, 0.9) 44%, rgba(255, 255, 255, 0.52) 100%),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.75), transparent 60%);
+}
+
+html[data-theme="light"] .hero h2 {
+  color: var(--text);
+}
+
+html[data-theme="light"] .hero p {
+  color: var(--muted);
+}
+
+html[data-theme="light"] .hero-meta {
+  color: var(--muted);
+}
+
+html[data-theme="light"] .hero-eyebrow {
+  color: color-mix(in srgb, var(--accent-2) 55%, #0c1a14);
+}
+
+html[data-theme="light"] .hero .btn.ghost {
+  background: rgba(255, 255, 255, 0.82);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html[data-theme="light"] .hero .progress {
+  background: rgba(24, 38, 61, 0.12);
+}
+
+html[data-theme="light"] .badge.accent {
+  background: rgba(var(--accent-rgb), 0.18);
+  color: #17692f;
+}
+
+html[data-theme="light"] .badge.blue {
+  background: rgba(92, 200, 255, 0.16);
+  border-color: rgba(24, 110, 150, 0.2);
+  color: #0f5d84;
+}
+
+html[data-theme="light"] .badge.violet {
+  background: rgba(167, 139, 250, 0.18);
+  border-color: rgba(90, 63, 168, 0.2);
+  color: #4a3390;
+}
+
+html[data-theme="light"] .badge.orange {
+  background: rgba(248, 169, 76, 0.22);
+  border-color: rgba(160, 90, 12, 0.22);
+  color: #8a4b06;
+}
+
+html[data-theme="light"] .account-row.active .badge.accent,
+html[data-theme="light"] .inst-card.picked .badge.accent,
+html[data-theme="light"] .nav-item.active .nav-badge {
+  background: #ffffff;
+  border-color: rgba(24, 38, 61, 0.16);
+  color: #17692f;
+}
+
+html[data-theme="light"] .modal .notice,
+html[data-theme="light"] .page-notice {
+  background: rgba(92, 200, 255, 0.12);
+  border-color: rgba(24, 110, 150, 0.22);
+}
+
+html[data-theme="light"] .toast {
+  background: #ffffff;
+  border-color: var(--border);
+  box-shadow: 0 16px 38px rgba(24, 38, 61, 0.16);
+  color: var(--text);
+}

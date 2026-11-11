@@ -30,6 +30,7 @@ const curseforge = require('./src/main/curseforge');
 const friends = require('./src/main/friends');
 const rpc = require('./src/main/rpc');
 const updater = require('./src/main/updater');
+const skinhub = require('./src/main/skinhub');
 const { ensureDir, exists, formatBytes } = require('./src/main/util');
 
 let mainWindow = null;
@@ -276,7 +277,7 @@ function createWindow() {
         console.log('[eval-error]', error.message);
       }
       await new Promise((resolve) => setTimeout(resolve, 1800));
-      if (process.env.KUBIK_SHOT && !process.env.KUBIK_EVAL) {
+      if (process.env.KUBIK_SHOT) {
         try {
           const image = await mainWindow.webContents.capturePage();
           fs.writeFileSync(path.join(process.env.KUBIK_SHOT, 'eval.png'), image.toPNG());
@@ -636,6 +637,11 @@ function registerIpc() {
     })),
   );
   ipcMain.handle('skins:open-site', wrap(() => shell.openExternal('https://ely.by/skins')));
+  ipcMain.handle('skins:fetch', wrap(({ nick }) => skinhub.fetchByNick(nick)));
+  ipcMain.handle('skins:catalog', wrap(({ page, size }) => skinhub.browse({ page, size })));
+  ipcMain.handle('skins:gallery', wrap(() => skinhub.gallery()));
+  ipcMain.handle('skins:gallery-save', wrap(({ dataUrl, name }) => skinhub.saveToGallery({ dataUrl, name })));
+  ipcMain.handle('skins:gallery-remove', wrap(({ name }) => skinhub.removeFromGallery({ name })));
   ipcMain.handle(
     'skins:save',
     wrap(async ({ dataUrl, suggestedName }) => {
