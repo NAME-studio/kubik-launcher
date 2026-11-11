@@ -1,9 +1,9 @@
 node_modules/
 release/
 win-unpacked/
-screenshots/
-screenshots*/
-shots/
+/screenshots/
+/screenshots*/
+/shots/
 *.log
 *.zip
 %APPDATA%/
@@ -13,4 +13,5 @@ trash/
 Thumbs.db
 desktop.ini
 scripts/
-shot-*.png
+/shot-*.png
+
