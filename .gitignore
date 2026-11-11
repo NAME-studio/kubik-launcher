@@ -1,0 +1,15 @@
+node_modules/
+release/
+win-unpacked/
+screenshots/
+screenshots*/
+shots/
+*.log
+*.zip
+%APPDATA%/
+trash/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+scripts/

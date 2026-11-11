@@ -1,0 +1,71 @@
+{
+  "name": "kubik-launcher",
+  "productName": "Kubik Launcher",
+  "version": "1.0.7",
+  "description": "Kubik Launcher — лаунчер Minecraft: Ely.by, моды, модпаки, редактор скинов",
+  "main": "main.js",
+  "author": "Kubik",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "dist": "electron-builder --win nsis portable",
+    "dist:portable": "electron-builder --win portable",
+    "dist:installer": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "ru.kubik.launcher",
+    "productName": "Kubik Launcher",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "NAME-studio",
+      "repo": "kubik-launcher",
+      "releaseType": "release"
+    },
+    "portable": {
+      "artifactName": "KubikLauncher.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Kubik Launcher",
+      "artifactName": "KubikLauncher-Setup-${version}.${ext}",
+      "uninstallDisplayName": "Kubik Launcher",
+      "include": "build/installer.nsh",
+      "installerHeader": "build/installerHeader.bmp",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    }
+  },
+  "dependencies": {
+    "discord-rpc": "^4.0.1",
+    "electron-updater": "^6.8.11"
+  }
+}
