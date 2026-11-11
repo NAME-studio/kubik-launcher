@@ -17,10 +17,46 @@ function nextBackoff() {
 function resetBackoff() {
   blockedUntil = 0;
   backoffMs = 0;
+  blockedReason = '';
 }
 
 function waitSeconds() {
   return Math.max(1, Math.ceil((blockedUntil - Date.now()) / 1000));
+}
+
+let blockedReason = '';
+
+function isPtMidnight(ts) {
+  const text = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'America/Los_Angeles',
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(ts));
+  return text === '00:00';
+}
+
+function quotaResetAt() {
+  const step = 15 * 60 * 1000;
+  const start = Math.ceil((Date.now() + 60 * 1000) / step) * step;
+  for (let ts = start; ts < start + 2 * 24 * 60 * 60 * 1000; ts += step) {
+    if (isPtMidnight(ts)) return ts;
+  }
+  return start + 24 * 60 * 60 * 1000;
+}
+
+function formatMsk(ts) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: 'Europe/Moscow',
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(ts));
+}
+
+function quotaMessage() {
+  return `Дневная квота Firestore исчерпана (бесплатный тариф). Обнулится ${formatMsk(blockedUntil)} по МСК — до этого друзья и общие сборки недоступны.`;
 }
 
 function config() {
@@ -43,9 +79,7 @@ function base() {
 
 function request(path, { method = 'GET', body } = {}) {
   if (Date.now() < blockedUntil) {
-    const error = new Error(
-      `Firestore ограничил запросы (429): сработал лимит бесплатного тарифа. Повтор через ${waitSeconds()} с, суточная квота обнуляется утром по МСК.`,
-    );
+    const error = new Error(blockedReason === 'quota' ? quotaMessage() : `Firestore ограничил запросы (429). Повтор через ${waitSeconds()} с.`);
     error.status = 429;
     error.retryIn = waitSeconds();
     return Promise.reject(error);
@@ -95,10 +129,17 @@ function rawRequest(path, { method = 'GET', body } = {}) {
           if (process.env.KUBIK_CLOUD_DEBUG) console.log('[cloud]', method, url, res.statusCode, data.slice(0, 160));
           const message = (parsed && parsed.error && parsed.error.message) || `Ошибка Firestore ${res.statusCode}`;
           if (res.statusCode === 429 || res.statusCode === 503) {
-            const wait = nextBackoff();
-            const error = new Error(
-              `Firestore ограничил запросы (429, суточный лимит бесплатного тарифа). Лаунчер повторит через ${Math.ceil(wait / 1000)} с и не будет спамить запросами.`,
-            );
+            const quota = /quota exceeded/i.test(message);
+            let wait = 0;
+            if (quota) {
+              blockedUntil = quotaResetAt();
+              backoffMs = blockedUntil - Date.now();
+              blockedReason = 'quota';
+              wait = backoffMs;
+            } else {
+              wait = nextBackoff();
+            }
+            const error = new Error(quota ? quotaMessage() : `Firestore ограничил запросы (429). Повтор через ${Math.ceil(wait / 1000)} с.`);
             error.status = res.statusCode;
             error.retryIn = Math.ceil(wait / 1000);
             reject(error);

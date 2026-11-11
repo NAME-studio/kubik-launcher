@@ -158,7 +158,7 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   java: {
-    list: () => invoke('java:list'),
+    list: (options) => invoke('java:list', options),
     download: (major) => invoke('java:download', { major }),
   },
 

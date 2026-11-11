@@ -724,7 +724,7 @@ function registerIpc() {
     ),
   );
 
-  ipcMain.handle('java:list', wrap(() => javaManager.listJava(true)));
+  ipcMain.handle('java:list', wrap((options) => javaManager.listJava(Boolean(options && options.force))));
   ipcMain.handle(
     'java:download',
     wrap(({ major }) => javaManager.downloadRuntime(major, progressFor(null, 'java:progress'))),

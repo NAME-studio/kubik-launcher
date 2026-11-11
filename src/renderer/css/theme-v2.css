@@ -1201,3 +1201,23 @@ html[data-theme="light"] .skin-tile .skin-figure {
 .skins-main .skin-tabs {
   margin-top: 14px;
 }
+
+/* Колонка холста: сам холст и 2D-превью под ним */
+.canvas-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.canvas-column .editor-preview {
+  padding: 8px 10px;
+}
+
+.canvas-column .editor-preview-figures {
+  min-height: 96px;
+}
+
+.canvas-column .editor-preview-figures canvas {
+  height: 92px;
+}

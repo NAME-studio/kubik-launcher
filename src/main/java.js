@@ -11,6 +11,8 @@ const { ensureDir, exists, isDir, formatBytes } = require('./util');
 const zip = require('./zip');
 
 let cache = null;
+let cacheAt = 0;
+const CACHE_TTL = 5 * 60 * 1000;
 
 function parseVersion(output) {
   const text = String(output || '');
@@ -98,7 +100,7 @@ function candidatePaths() {
 }
 
 async function listJava(force = false) {
-  if (cache && !force) return cache;
+  if (cache && !force && Date.now() - cacheAt < CACHE_TTL) return cache;
   const found = [];
   for (const candidate of candidatePaths()) {
     if (candidate === 'java.exe' || exists(candidate)) {
@@ -113,6 +115,7 @@ async function listJava(force = false) {
   }
   found.sort((a, b) => b.major - a.major);
   cache = found;
+  cacheAt = Date.now();
   return found;
 }
 

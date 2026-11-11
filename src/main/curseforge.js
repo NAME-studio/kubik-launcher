@@ -100,7 +100,11 @@ async function install(instanceId, modId, options = {}) {
   const name = safeName(file.fileName || `${modId}.jar`);
   const target = path.join(dir, name);
   if (exists(target)) return { file: name, skipped: true };
-  await net.downloadFile(file.downloadUrl, target);
+  try {
+    await net.downloadFile(file.downloadUrl, target);
+  } catch (error) {
+    throw new Error(`Не удалось скачать файл с CDN CurseForge: ${error.message}. Попробуйте другую версию мода или файл.`);
+  }
   return { file: name, bytes: fs.existsSync(target) ? fs.statSync(target).size : 0 };
 }
 

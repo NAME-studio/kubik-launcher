@@ -324,7 +324,6 @@ window.Views.skins = (() => {
     const side = UI.el(
       'div',
       { class: 'editor-side' },
-      previewBlock || null,
       UI.el('div', { class: 'field' }, UI.el('label', {}, 'Инструменты'), toolGrid),
       UI.el(
         'div',
@@ -357,7 +356,13 @@ window.Views.skins = (() => {
     buildPalette(palette, colorInput, colorPreview, colorCode);
     palette.firstChild && palette.firstChild.classList.add('active');
 
-    const body = UI.el('div', { class: 'editor-body' }, UI.el('div', { class: 'canvas-wrap' }, canvas), side);
+    const canvasColumn = UI.el(
+      'div',
+      { class: 'canvas-column' },
+      UI.el('div', { class: 'canvas-wrap' }, canvas),
+      previewBlock || null,
+    );
+    const body = UI.el('div', { class: 'editor-body' }, canvasColumn, side);
     return { body, canvas, colorInput, colorPreview, colorCode };
   }
 
