@@ -116,10 +116,11 @@
   .hero { padding: 64px 0 34px; }
 
   .hero-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.18fr);
-    gap: 48px;
-    align-items: center;
+    display: block;
+  }
+
+  .hero-copy {
+    max-width: 780px;
   }
 
   .eyebrow {
@@ -162,6 +163,7 @@
   .meta span::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--muted-2); }
 
   .shot-frame {
+    margin-top: 40px;
     position: relative;
     border-radius: var(--radius);
     border: 1px solid var(--line);
@@ -368,8 +370,6 @@
 
   @media (max-width: 900px) {
     .hero { padding-top: 40px; }
-    .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
-    .shot-frame { transform: none; }
     .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .steps { grid-template-columns: minmax(0, 1fr); }
     .nav { display: none; }
@@ -434,7 +434,7 @@
 
   <section class="hero">
     <div class="wrap hero-grid">
-      <div>
+      <div class="hero-copy">
         <p class="eyebrow">Лаунчер Minecraft для Windows</p>
         <h1>Сборки, моды и скины — <span>в одном месте</span></h1>
         <p class="lead">
