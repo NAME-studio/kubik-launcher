@@ -168,11 +168,7 @@
     background: var(--panel);
     padding: 10px;
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
-    transform: perspective(1200px) rotateY(-6deg) rotateX(2deg);
-    transition: transform 0.4s ease;
   }
-
-  .shot-frame:hover { transform: perspective(1200px) rotateY(0deg) rotateX(0deg); }
 
   .shot-frame img { border-radius: 11px; }
 
@@ -401,7 +397,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .shot-frame, .btn { transition: none; }
+    .btn { transition: none; }
   }
 </style>
 </head>
@@ -458,7 +454,7 @@
       </div>
 
       <figure class="shot-frame">
-        <img src="screenshots/home.jpg" width="1600" height="917" alt="Главный экран Kubik Launcher со сборкой и статистикой" />
+        <img src="screenshots/hero.jpg" width="1920" height="900" alt="Главный экран Kubik Launcher" />
         <figcaption>Главная: выбранная сборка, память и быстрый запуск</figcaption>
       </figure>
     </div>
