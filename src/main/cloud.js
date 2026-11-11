@@ -5,6 +5,24 @@ const store = require('./store');
 
 const HOST = 'firestore.googleapis.com';
 
+let blockedUntil = 0;
+let backoffMs = 0;
+
+function nextBackoff() {
+  backoffMs = backoffMs ? Math.min(backoffMs * 2, 15 * 60 * 1000) : 2 * 60 * 1000;
+  blockedUntil = Date.now() + backoffMs;
+  return backoffMs;
+}
+
+function resetBackoff() {
+  blockedUntil = 0;
+  backoffMs = 0;
+}
+
+function waitSeconds() {
+  return Math.max(1, Math.ceil((blockedUntil - Date.now()) / 1000));
+}
+
 function config() {
   const settings = store.getSettings();
   return {
@@ -24,6 +42,14 @@ function base() {
 }
 
 function request(path, { method = 'GET', body } = {}) {
+  if (Date.now() < blockedUntil) {
+    const error = new Error(
+      `Firestore ограничил запросы (429). Лаунчер сам повторит через ${waitSeconds()} с — это суточный лимит бесплатного тарифа.`,
+    );
+    error.status = 429;
+    error.retryIn = waitSeconds();
+    return Promise.reject(error);
+  }
   const send = () => rawRequest(path, { method, body });
   return send().catch((error) => {
     if (/ETIMEDOUT|EAI_AGAIN|ECONNRESET|timeout/i.test(String(error.message))) return send();
@@ -61,12 +87,23 @@ function rawRequest(path, { method = 'GET', body } = {}) {
             parsed = { raw: data };
           }
           if (res.statusCode >= 200 && res.statusCode < 300) {
+            resetBackoff();
             if (process.env.KUBIK_CLOUD_DEBUG) console.log('[cloud]', method, url, res.statusCode);
             resolve(parsed);
             return;
           }
           if (process.env.KUBIK_CLOUD_DEBUG) console.log('[cloud]', method, url, res.statusCode, data.slice(0, 160));
           const message = (parsed && parsed.error && parsed.error.message) || `Ошибка Firestore ${res.statusCode}`;
+          if (res.statusCode === 429 || res.statusCode === 503) {
+            const wait = nextBackoff();
+            const error = new Error(
+              `Firestore ограничил запросы (429, суточный лимит бесплатного тарифа). Лаунчер повторит через ${Math.ceil(wait / 1000)} с и не будет спамить запросами.`,
+            );
+            error.status = res.statusCode;
+            error.retryIn = Math.ceil(wait / 1000);
+            reject(error);
+            return;
+          }
           if (/has not been used|is disabled|PERMISSION_DENIED/i.test(message)) {
             const error = new Error(
               'Firestore не включён или правила закрыты. Включите Firestore Database в проекте kubik-launcher (Build → Firestore Database → Create database) и выберите тестовые правила.',
@@ -143,6 +180,25 @@ async function getDoc(collection, id) {
     if (error.status === 404) return null;
     throw error;
   }
+}
+
+async function batchGet(collection, ids) {
+  const list = (ids || []).filter(Boolean);
+  if (!list.length) return {};
+  const { projectId } = config();
+  const documents = list.map(
+    (id) => `projects/${projectId}/databases/(default)/documents/${collection}/${encodeURIComponent(id)}`,
+  );
+  const result = await request(':batchGet', { method: 'POST', body: { documents } });
+  const rows = Array.isArray(result) ? result : [];
+  const map = {};
+  for (const row of rows) {
+    if (row && row.found) {
+      const doc = docToObject(row.found);
+      if (doc) map[doc.id] = doc;
+    }
+  }
+  return map;
 }
 
 async function setDoc(collection, id, data) {
@@ -226,4 +282,4 @@ async function removeDoc(collection, id) {
   }
 }
 
-module.exports = { ready, config, getDoc, setDoc, patchDoc, createDoc, query, removeDoc };
+module.exports = { ready, config, getDoc, batchGet, setDoc, patchDoc, createDoc, query, removeDoc, blockedSeconds: () => waitSeconds() };

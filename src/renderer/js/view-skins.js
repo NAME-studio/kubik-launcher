@@ -25,11 +25,107 @@ window.Views.skins = (() => {
   }
 
   function renderPreview() {
-    if (!refs.preview || !editor) return;
-    window.SkinRender.drawCharacter(refs.preview, editor.tex, {
+    if (!editor) return;
+    if (refs.viewer) {
+      refs.viewer.setTexture(editor.tex);
+      refs.viewer.setModel(state.model);
+    }
+    if (refs.preview2d) {
+      window.SkinRender.drawCharacter(refs.preview2d, editor.tex, { model: state.model, view: 'front', scale: 5 });
+    }
+    if (refs.preview2dBack) {
+      window.SkinRender.drawCharacter(refs.preview2dBack, editor.tex, { model: state.model, view: 'back', scale: 5 });
+    }
+  }
+
+  async function downloadSkin() {
+    const acc = account();
+    try {
+      const file = await UI.req(window.api.skins.save(editor.exportDataUrl(), `${acc?.username || 'skin'}.png`));
+      if (file) UI.toast('PNG сохранён', 'success');
+    } catch (error) {
+      UI.toast(error.message, 'error');
+    }
+  }
+
+  function detailsDialog() {
+    if (!editor) return;
+    const acc = account();
+    const big = UI.el('canvas', { class: 'skin-3d skin-3d-lg' });
+    const front = UI.el('canvas', { class: 'skin-2d' });
+    const back = UI.el('canvas', { class: 'skin-2d' });
+    window.SkinRender.drawCharacter(front, editor.tex, { model: state.model, view: 'front', scale: 5 });
+    window.SkinRender.drawCharacter(back, editor.tex, { model: state.model, view: 'back', scale: 5 });
+
+    let bytes = 0;
+    try {
+      bytes = Math.round(((editor.exportDataUrl().length - 22) * 3) / 4);
+    } catch {
+      bytes = 0;
+    }
+    const kb = bytes ? `${Math.max(1, Math.round(bytes / 1024))} КБ` : '—';
+
+    const facts = [
+      ['Игрок', acc ? acc.username : 'Гость'],
+      ['Модель', state.model === 'slim' ? 'Slim, тонкие руки' : 'Classic, обычные руки'],
+      ['Разрешение', '64 × 64 px'],
+      ['Формат', 'PNG, 32 бита'],
+      ['Вес', kb],
+    ];
+
+    const viewer = window.Skin3D.create(big, {
+      texture: editor.tex,
       model: state.model,
-      view: state.view,
-      scale: 9,
+      autoRotate: true,
+    });
+
+    const info = UI.el(
+      'div',
+      { class: 'skin-facts' },
+      ...facts.map(([key, value]) =>
+        UI.el('div', { class: 'skin-fact' }, UI.el('span', { class: 'skin-fact-key', text: key }), UI.el('span', { text: value })),
+      ),
+    );
+
+    const body = UI.el(
+      'div',
+      { class: 'skin-details' },
+      UI.el(
+        'div',
+        { class: 'skin-details-stage' },
+        big,
+        UI.el('div', { class: 'stage-hint', text: 'потяните, чтобы покрутить · колесо — масштаб · двойной клик — сброс' }),
+      ),
+      UI.el(
+        'div',
+        { class: 'skin-details-side' },
+        UI.el('div', { class: 'palette-label' }, 'Спереди и сзади'),
+        UI.el('div', { class: 'editor-preview-figures' }, front, back),
+        info,
+        UI.el('div', { class: 'divider' }),
+        UI.el('button', { class: 'btn sm block', onclick: () => downloadSkin() }, UI.icon('download'), 'Скачать PNG'),
+        UI.el('button', {
+          class: 'btn sm block ghost',
+          onclick: async () => {
+            try {
+              await UI.req(window.api.skins.gallerySave(editor.exportDataUrl(), `${acc?.username || 'skin'}-${Date.now()}`));
+              UI.toast('Скин сохранён в галерею', 'success');
+            } catch (error) {
+              UI.toast(error.message, 'error');
+            }
+          },
+        }, UI.icon('save'), 'В галерею'),
+      ),
+    );
+
+    requestAnimationFrame(() => viewer.render());
+    UI.modal({
+      title: 'Скин подробнее',
+      subtitle: 'Модель и текстура — можно крутить мышью',
+      wide: true,
+      body,
+      actions: [{ label: 'Закрыть', kind: 'ghost' }],
+      onClose: () => viewer.destroy(),
     });
   }
 
@@ -116,7 +212,7 @@ window.Views.skins = (() => {
     UI.toast('Загрузите скин на сайте Ely.by и нажмите «Обновить» — он появится здесь и в игре', 'info', 9000);
   }
 
-  function buildEditorCard() {
+  function buildEditorCard(previewBlock) {
     const canvas = UI.el('canvas', { id: 'skin-canvas' });
     const colorInput = UI.el('input', { type: 'color', value: window.accentColor ? window.accentColor() : '#8ce86a' });
     const colorPreview = UI.el('div', { class: 'color-preview', style: { background: window.accentColor ? window.accentColor() : '#8ce86a' } });
@@ -215,6 +311,7 @@ window.Views.skins = (() => {
     const side = UI.el(
       'div',
       { class: 'editor-side' },
+      previewBlock || null,
       UI.el('div', { class: 'field' }, UI.el('label', {}, 'Инструменты'), toolGrid),
       UI.el(
         'div',
@@ -378,48 +475,125 @@ window.Views.skins = (() => {
     );
   }
 
+  function skinTile(dataUrl, title, buttons) {
+    return UI.el(
+      'div',
+      { class: 'skin-tile' },
+      UI.el('img', { src: dataUrl, alt: '', loading: 'lazy' }),
+      title ? UI.el('div', { class: 'skin-tile-name', text: title }) : null,
+      UI.el('div', { class: 'skin-tile-actions' }, buttons),
+    );
+  }
+
   function catalogGrid() {
     const grid = UI.el('div', { class: 'skin-gallery' });
     const status = UI.el('div', { class: 'tiny muted', text: 'Загружаю каталог скинов…' });
-    const moreBtn = UI.el('button', { class: 'btn sm', disabled: true }, 'Показать ещё');
-    const refreshBtn = UI.el('button', { class: 'btn sm ghost icon-only', title: 'Обновить каталог', onclick: () => { page = 0; load(false); } }, UI.icon('refresh'));
-    const galleryHost = UI.el('div', { class: 'skin-gallery' });
+    const sentinel = UI.el('div', { class: 'skin-sentinel' });
+    const refreshBtn = UI.el('button', {
+      class: 'btn sm ghost icon-only',
+      title: 'Обновить каталог',
+      onclick: () => {
+        page = 0;
+        done = false;
+        UI.clear(grid);
+        load(false);
+      },
+    }, UI.icon('refresh'));
     let page = 0;
     let loading = false;
+    let done = false;
+    let total = 0;
 
-    const tile = (dataUrl, title, buttons) =>
-      UI.el(
-        'div',
-        { class: 'skin-tile' },
-        UI.el('img', { src: dataUrl, alt: '' }),
-        title ? UI.el('div', { class: 'skin-tile-name', text: title }) : null,
-        UI.el('div', { class: 'skin-tile-actions' }, buttons),
+    const load = async (next) => {
+      if (loading || (next && done)) return;
+      loading = true;
+      status.textContent = next ? 'Подгружаю ещё скины…' : 'Загружаю каталог скинов…';
+      try {
+        const result = await UI.req(window.api.skins.catalog({ page: next ? page + 1 : 1, size: 24 }));
+        if (!next) UI.clear(grid);
+        page = result.page || (next ? page + 1 : 1);
+        total = result.total || total;
+        for (const item of result.items) {
+          grid.append(
+            skinTile(item.dataUrl, '', [
+              UI.el('button', { class: 'btn sm primary', onclick: () => applySkinData(item.dataUrl) }, 'Применить'),
+              UI.el('button', {
+                class: 'btn sm icon-only',
+                title: 'В галерею',
+                onclick: async () => {
+                  try {
+                    await UI.req(window.api.skins.gallerySave(item.dataUrl, `skin-${item.id}`));
+                    UI.toast('Скин сохранён в галерею', 'success');
+                  } catch (error) {
+                    UI.toast(error.message, 'error');
+                  }
+                },
+              }, UI.icon('save')),
+            ]),
+          );
+        }
+        done = !result.items.length || (result.total ? page * 24 >= result.total : result.items.length < 24);
+        status.textContent = done
+          ? `Показано ${grid.children.length}${total ? ` из ${UI.num(total)}` : ''} — это весь каталог.`
+          : `Показано ${grid.children.length}${total ? ` из ${UI.num(total)}` : ''} — прокрутите, чтобы подгрузить ещё.`;
+      } catch (error) {
+        status.textContent = `Каталог недоступен: ${error.message}`;
+      } finally {
+        loading = false;
+      }
+    };
+
+    if (typeof IntersectionObserver === 'function') {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) load(true);
+        },
+        { root: document.getElementById('page'), rootMargin: '500px 0px' },
       );
+      observer.observe(sentinel);
+      refs.catalogObserver = observer;
+    }
+    load(false);
 
-    const paintGallery = async () => {
-      UI.clear(galleryHost);
+    return UI.el(
+      'div',
+      { class: 'card pad skin-tab-card' },
+      UI.el('div', { class: 'card-head' },
+        UI.el('div', { class: 'card-title' }, UI.icon('grid'), 'Каталог скинов'),
+        UI.el('div', { class: 'row', style: { gap: '8px' } }, UI.el('span', { class: 'badge', text: 'прокрутка = ещё' }), refreshBtn),
+      ),
+      status,
+      grid,
+      sentinel,
+    );
+  }
+
+  function galleryCard() {
+    const grid = UI.el('div', { class: 'skin-gallery' });
+    const status = UI.el('div', { class: 'tiny muted', text: 'Загружаю галерею…' });
+
+    const paint = async () => {
+      UI.clear(grid);
       let items = [];
       try {
         items = await UI.req(window.api.skins.gallery());
       } catch (error) {
-        galleryHost.append(UI.el('div', { class: 'tiny muted', text: `Галерея недоступна: ${error.message}` }));
+        status.textContent = `Галерея недоступна: ${error.message}`;
         return;
       }
-      if (!items.length) {
-        galleryHost.append(UI.el('div', { class: 'tiny muted', text: 'Галерея пуста.' }));
-        return;
-      }
+      status.textContent = items.length ? `Сохранено скинов: ${items.length}` : 'Галерея пуста. Сохраняйте скины кнопкой «В галерею».';
       for (const item of items) {
-        galleryHost.append(
-          tile(item.dataUrl, item.name, [
-            UI.el('button', { class: 'btn sm', onclick: () => applySkinData(item.dataUrl) }, 'Применить'),
+        grid.append(
+          skinTile(item.dataUrl, item.name, [
+            UI.el('button', { class: 'btn sm primary', onclick: () => applySkinData(item.dataUrl) }, 'В редактор'),
             UI.el('button', {
               class: 'btn sm ghost icon-only',
               title: 'Удалить',
               onclick: async () => {
                 try {
                   await UI.req(window.api.skins.galleryRemove(item.name));
-                  paintGallery();
+                  await paint();
+                  UI.toast('Удалено из галереи', 'info');
                 } catch (error) {
                   UI.toast(error.message, 'error');
                 }
@@ -430,60 +604,18 @@ window.Views.skins = (() => {
       }
     };
 
-    const load = async (next) => {
-      if (loading) return;
-      loading = true;
-      moreBtn.disabled = true;
-      status.textContent = next ? `Загружаю страницу ${page + 1}…` : 'Загружаю каталог скинов…';
-      try {
-        const result = await UI.req(window.api.skins.catalog({ page: next ? page + 1 : 1, size: 30 }));
-        if (!next) UI.clear(grid);
-        page = result.page || (next ? page + 1 : 1);
-        for (const item of result.items) {
-          grid.append(
-            tile(item.dataUrl, '', [
-              UI.el('button', { class: 'btn sm primary', onclick: () => applySkinData(item.dataUrl) }, 'Применить'),
-              UI.el('button', {
-                class: 'btn sm',
-                onclick: async () => {
-                  try {
-                    await UI.req(window.api.skins.gallerySave(item.dataUrl, `skin-${item.id}`));
-                    await paintGallery();
-                    UI.toast('Скин сохранён в галерею', 'success');
-                  } catch (error) {
-                    UI.toast(error.message, 'error');
-                  }
-                },
-              }, 'В галерею'),
-            ]),
-          );
-        }
-        status.textContent = result.items.length
-          ? `В каталоге ${UI.num(result.total || 0)} скинов, показано ${grid.children.length}.`
-          : 'Каталог пуст — нажмите «Обновить».';
-      } catch (error) {
-        status.textContent = `Каталог недоступен: ${error.message}`;
-      } finally {
-        loading = false;
-        moreBtn.disabled = false;
-      }
-    };
-
-    moreBtn.addEventListener('click', () => load(true));
-    paintGallery();
-    load(false);
+    const refreshBtn = UI.el('button', { class: 'btn sm ghost icon-only', title: 'Обновить галерею', onclick: () => paint() }, UI.icon('refresh'));
+    paint();
 
     return UI.el(
       'div',
-      { class: 'card pad', style: { marginTop: '16px' } },
+      { class: 'card pad skin-tab-card' },
       UI.el('div', { class: 'card-head' },
-        UI.el('div', { class: 'card-title' }, UI.icon('grid'), 'Каталог скинов'),
-        UI.el('div', { class: 'row', style: { gap: '8px' } }, refreshBtn, moreBtn),
+        UI.el('div', { class: 'card-title' }, UI.icon('layers'), 'Моя галерея'),
+        UI.el('div', { class: 'row', style: { gap: '8px' } }, refreshBtn),
       ),
       status,
       grid,
-      UI.el('div', { class: 'skin-sub', text: 'Моя галерея' }),
-      galleryHost,
     );
   }
 
@@ -492,10 +624,12 @@ window.Views.skins = (() => {
     kicker: 'Персонаж и скин',
     render(container) {
       const acc = account();
-      state = { model: acc?.skinModel || 'classic', view: 'front' };
+      state = { model: acc?.skinModel || 'classic', view: '3d' };
 
-      const preview = UI.el('canvas');
-      refs = { preview };
+      const preview = UI.el('canvas', { class: 'skin-3d' });
+      const preview2d = UI.el('canvas', { class: 'skin-2d' });
+      const preview2dBack = UI.el('canvas', { class: 'skin-2d' });
+      refs = { preview, preview2d, preview2dBack };
 
       const nickLabel = UI.el('div', { class: 'skin-nick', text: acc ? acc.username : 'Стив' });
       const modelBadge = UI.el('div', { class: 'skin-sub', text: 'обычные руки (classic)' });
@@ -517,15 +651,27 @@ window.Views.skins = (() => {
       refs.modelButtons = modelButtons;
 
       const viewToggle = UI.el('div', { class: 'tabs' });
-      for (const [id, label] of [['front', 'Спереди'], ['back', 'Сзади']]) {
+      const viewButtons = {};
+      for (const [id, label] of [['3d', '3D'], ['front', 'Спереди'], ['back', 'Сзади']]) {
         const button = UI.el('button', { class: `tab${state.view === id ? ' active' : ''}`, text: label });
         button.addEventListener('click', () => {
-          state.view = id;
-          [...viewToggle.children].forEach((node) => node.classList.remove('active'));
-          button.classList.add('active');
-          renderPreview();
+          setView(id);
         });
+        viewButtons[id] = button;
         viewToggle.append(button);
+      }
+
+      function setView(id) {
+        state.view = id;
+        for (const [key, button] of Object.entries(viewButtons)) button.classList.toggle('active', key === id);
+        if (!refs.viewer) return;
+        if (id === '3d') {
+          refs.viewer.setAngles(-0.55, 0.12);
+          refs.viewer.setAutoRotate(true);
+          return;
+        }
+        refs.viewer.setAutoRotate(false);
+        refs.viewer.setAngles(id === 'back' ? Math.PI : 0, 0);
       }
 
       const nickInput = UI.el('input', { class: 'input', placeholder: 'Ник игрока, например Notch' });
@@ -538,7 +684,9 @@ window.Views.skins = (() => {
           const data = await UI.req(window.api.skins.data(nick));
           const source = data.skin || App.defaultSkin(profile.model);
           const image = await window.SkinRender.loadImage(source);
-          window.SkinRender.drawCharacter(preview, image, { model: profile.model, view: state.view, scale: 9 });
+          refs.viewer?.setTexture(image);
+          window.SkinRender.drawCharacter(preview2d, image, { model: profile.model, view: 'front', scale: 5 });
+          window.SkinRender.drawCharacter(preview2dBack, image, { model: profile.model, view: 'back', scale: 5 });
           nickLabel.textContent = profile.name || nick;
           modelBadge.textContent = profile.model === 'slim' ? 'тонкие руки (slim)' : 'обычные руки (classic)';
           state.model = profile.model;
@@ -610,26 +758,32 @@ window.Views.skins = (() => {
 
       const downloadBtn = UI.el('button', {
         class: 'btn sm ghost',
-        onclick: async () => {
-          try {
-            const file = await UI.req(window.api.skins.save(editor.exportDataUrl(), `${acc?.username || 'skin'}.png`));
-            if (file) UI.toast('PNG сохранён', 'success');
-          } catch (error) {
-            UI.toast(error.message, 'error');
-          }
-        },
+        onclick: () => downloadSkin(),
       }, UI.icon('download'), 'Скачать PNG');
+
+      const detailsBtn = UI.el('button', {
+        class: 'btn sm block',
+        onclick: () => detailsDialog(),
+      }, UI.icon('info'), 'Подробнее');
+
+      const stage = UI.el(
+        'div',
+        { class: 'skin-stage skin-stage-3d' },
+        preview,
+        UI.el('div', { class: 'stage-hint', text: 'потяните, чтобы покрутить · колесо — масштаб' }),
+      );
 
       const left = UI.el(
         'div',
         { class: 'card skin-card' },
-        UI.el('div', { class: 'skin-stage' }, preview),
+        stage,
         nickLabel,
         modelBadge,
         dirtyBadge,
         viewToggle,
         modelButtons,
         UI.el('div', { class: 'skin-actions' }, primaryBtn, refreshBtn, downloadBtn),
+        detailsBtn,
         UI.el('div', { class: 'divider' }),
         UI.el('div', { class: 'field', style: { width: '100%' } }, UI.el('label', {}, 'Посмотреть скин другого игрока'), nickInput),
         UI.el('button', {
@@ -640,21 +794,53 @@ window.Views.skins = (() => {
         friendsStrip,
       );
 
-      const { body, canvas } = buildEditorCard();
+      const previewBlock = UI.el(
+        'div',
+        { class: 'editor-preview' },
+        UI.el('div', { class: 'palette-label' }, 'Вид 2D'),
+        UI.el('div', { class: 'editor-preview-figures' }, preview2d, preview2dBack),
+        UI.el('div', { class: 'tiny muted', text: 'Спереди · сзади' }),
+      );
+
+      const { body, canvas } = buildEditorCard(previewBlock);
       const editorCard = UI.el(
         'div',
-        { class: 'card' },
+        { class: 'card editor-card' },
         UI.el(
           'div',
           { class: 'card-head', style: { padding: '16px 16px 0' } },
           UI.el('div', { class: 'card-title' }, UI.icon('edit'), 'Редактор скина 64×64'),
-          UI.el('div', { class: 'row', style: { gap: '8px' } }, UI.el('span', { class: 'badge', text: 'PNG' }), dirtyBadge),
+          UI.el('div', { class: 'row', style: { gap: '8px' } },
+            UI.el('span', { class: 'badge', text: 'PNG' }),
+            dirtyBadge,
+            UI.el('button', { class: 'btn sm ghost', onclick: () => detailsDialog() }, UI.icon('info'), 'Подробнее'),
+          ),
         ),
         UI.el('div', { class: 'editor' }, body),
       );
 
+      const tabsBar = UI.el('div', { class: 'tabs skin-tabs' });
+      const tabHost = UI.el('div', { class: 'skin-tab-host' });
+      const catalogNode = catalogGrid();
+      const galleryNode = galleryCard();
+      const tabNodes = { catalog: catalogNode, gallery: galleryNode };
+      let activeTab = 'catalog';
+
+      const setTab = (id) => {
+        activeTab = id;
+        for (const node of tabsBar.children) node.classList.toggle('active', node.dataset.tab === id);
+        UI.clear(tabHost);
+        tabHost.append(tabNodes[id]);
+      };
+      for (const [id, label] of [['catalog', 'Каталог'], ['gallery', 'Галерея']]) {
+        const button = UI.el('button', { class: `tab${id === 'catalog' ? ' active' : ''}`, dataset: { tab: id }, text: label });
+        button.addEventListener('click', () => setTab(id));
+        tabsBar.append(button);
+      }
+
       container.append(UI.el('div', { class: 'skins-layout' }, left, editorCard));
-      container.append(catalogGrid());
+      container.append(tabsBar, tabHost);
+      setTab(activeTab);
 
       editor = new window.SkinEditor({
         canvas,
@@ -671,6 +857,12 @@ window.Views.skins = (() => {
         const code = editorCard.querySelector('.color-current code');
         if (code) code.textContent = color;
       };
+
+      refs.viewer = window.Skin3D.create(preview, {
+        texture: editor.tex,
+        model: state.model,
+        autoRotate: true,
+      });
 
       renderPreview();
       loadAccountSkin();
@@ -697,6 +889,8 @@ window.Views.skins = (() => {
       );
     },
     destroy() {
+      if (refs.catalogObserver) refs.catalogObserver.disconnect();
+      if (refs.viewer) refs.viewer.destroy();
       editor = null;
       refs = {};
       state = {};

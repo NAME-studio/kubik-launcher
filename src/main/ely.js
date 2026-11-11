@@ -128,13 +128,30 @@ function parseTextures(profile) {
   }
 }
 
+async function resolveUuid(name) {
+  const list = await net.fetchJson(`${AUTH_INJECTOR_API_ROOT}/api/profiles/minecraft`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify([name]),
+    timeout: 20000,
+  });
+  if (!Array.isArray(list) || !list.length) return null;
+  const row = list.find((item) => String(item.name || '').toLowerCase() === name.toLowerCase()) || list[0];
+  return row && row.id ? { id: row.id, name: row.name || name } : null;
+}
+
 async function skinProfile(nickname) {
   const name = String(nickname || '').trim();
   if (!name) throw new Error('Не указан ник');
   try {
-    const profile = await net.fetchJson(`${SKIN_SYSTEM}/profile/${encodeURIComponent(name)}`, { timeout: 20000 });
+    const found = await resolveUuid(name);
+    if (!found) return { skin: null, cape: null, model: 'classic', name, empty: true };
+    const profile = await net.fetchJson(
+      `${AUTH_INJECTOR_API_ROOT}/sessionserver/session/minecraft/profile/${encodeURIComponent(found.id)}`,
+      { timeout: 20000 },
+    );
     const parsed = parseTextures(profile);
-    return { ...parsed, name: profile.name || name, id: profile.id || null };
+    return { ...parsed, name: (profile && profile.name) || found.name, id: found.id, empty: !parsed.skin };
   } catch (error) {
     if (error.status === 204) return { skin: null, cape: null, model: 'classic', name, empty: true };
     return { skin: null, cape: null, model: 'classic', name, error: error.message };
@@ -144,14 +161,22 @@ async function skinProfile(nickname) {
 async function downloadSkinTexture(nickname) {
   const name = String(nickname || '').trim();
   if (!name) return null;
-  try {
-    const response = await net.request(`${SKIN_SYSTEM}/skins/${encodeURIComponent(name)}.png?version=2`);
-    if (!response.ok) return null;
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
-  } catch {
-    return null;
+  const urls = [
+    `${SKIN_SYSTEM}/skins/${encodeURIComponent(name)}.png?version=2`,
+    `${SKIN_SYSTEM}/skins/${encodeURIComponent(name)}.png`,
+  ];
+  for (const url of urls) {
+    try {
+      const response = await net.request(url, { timeout: 20000 });
+      if (!response.ok) continue;
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      if (buffer.length >= 64) return buffer;
+    } catch {
+      /* пробуем следующий адрес */
+    }
   }
+  return null;
 }
 
 async function skinDataUrl(nickname) {
@@ -189,8 +214,11 @@ async function accountSkin(account) {
     }
     return { dataUrl: null, model: account.skinModel || 'classic', fallback: true };
   }
-  const dataUrl = await skinDataUrl(account.username);
-  return { dataUrl, model: account.skinModel || 'classic', fallback: !dataUrl };
+  const profile = await skinProfile(account.username);
+  let dataUrl = null;
+  if (profile && profile.skin) dataUrl = await urlDataUrl(profile.skin);
+  if (!dataUrl) dataUrl = await skinDataUrl(account.username);
+  return { dataUrl, model: account.skinModel || (profile && profile.model) || 'classic', fallback: !dataUrl };
 }
 
 function fileDataUrl(file) {
