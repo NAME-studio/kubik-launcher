@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kubik Launcher — политика конфиденциальности</title>
+<meta name="description" content="Какие данные хранит и передаёт Kubik Launcher." />
+<meta name="theme-color" content="#070a0f" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 9.5v13L16 29 4 22.5v-13L16 3Z' fill='%238ce86a'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #070a0f;
+    --panel: #101823;
+    --line: #1e2b3a;
+    --text: #eaf2fb;
+    --muted: #93a5b9;
+    --accent: #8ce86a;
+    --radius: 20px;
+    --max: 780px;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 20px 64px;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--max); margin: 0 auto; }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 22px 0 18px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .2px; }
+  .brand svg { width: 26px; height: 26px; }
+  .brand a { color: inherit; text-decoration: none; }
+  .back { color: var(--accent); text-decoration: none; font-size: 14px; }
+  .back:hover { text-decoration: underline; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 36px 0 8px; letter-spacing: -.4px; }
+  .lead { color: var(--muted); margin: 0 0 28px; }
+  h2 { font-size: 19px; margin: 32px 0 10px; }
+  p, li { color: var(--text); }
+  p { margin: 10px 0; }
+  ul { margin: 10px 0 10px 20px; padding: 0; }
+  li { margin: 6px 0; }
+  code { font-family: var(--mono); font-size: 13.5px; background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 6px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin: 18px 0; }
+  .muted { color: var(--muted); }
+  footer { margin-top: 44px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M16 3 28 9.5v13L16 29 4 22.5v-13L16 3Z" fill="#8ce86a"/></svg>
+      <a href="index.html">Kubik Launcher</a>
+    </div>
+    <a class="back" href="index.html">← На главную</a>
+  </header>
+
+  <h1>Политика конфиденциальности</h1>
+  <p class="lead">Обновлено 12 ноября 2026 года. Лаунчер бесплатный, без рекламы и без аналитики.</p>
+
+  <h2>Что хранится только на вашем компьютере</h2>
+  <p>Настройки, список сборок, аккаунты, скины, сохранённые серверы, копии миров, Java и скачанные файлы лежат в папке данных лаунчера и в <code>%APPDATA%\.KubikLauncher</code>. Лаунчер не отправляет эти данные разработчику.</p>
+
+  <h2>Какие данные уходят во внешние сервисы</h2>
+  <p>Обращения уходят только тем сервисам, которые нужны для выбранного действия:</p>
+  <ul>
+    <li><b>Mojang / Microsoft</b> — вход в аккаунт Minecraft и загрузка версий, библиотек и ресурсов.</li>
+    <li><b>Ely.by</b> — если вы выбрали вход через Ely.by: логин, токен сессии и скин.</li>
+    <li><b>Modrinth и CurseForge</b> — поиск и скачивание модов, ресурспаков, шейдеров и модпаков. Им передаётся текст запроса и выбранные фильтры.</li>
+    <li><b>Firebase</b> — только если вы пользуетесь функциями друзей и общих сборок: ник, код друга и состав сборки.</li>
+    <li><b>GitHub</b> — проверка обновлений и скачивание новой версии.</li>
+  </ul>
+  <p>Лаунчер не собирает аналитику, не показывает рекламу и не передаёт данные третьим лицам для маркетинга.</p>
+
+  <h2>Ключи и токены</h2>
+  <p>API-ключи (CurseForge, Firebase) и токены аккаунтов хранятся локально в файле конфигурации и используются только для запросов к соответствующим сервисам. Файл не покидает компьютер.</p>
+
+  <h2>Логи</h2>
+  <p>Логи запусков и установки пишутся в папку данных лаунчера. Они никуда не отправляются, пока вы сами не скопируете их для обращения в поддержку.</p>
+
+  <h2>Дети</h2>
+  <p>Лаунчер не предназначен для сбора данных о детях и не запрашивает возраст, имя или контакты.</p>
+
+  <h2>Удаление данных</h2>
+  <p>Чтобы удалить всё локальное, закройте лаунчер и удалите папку <code>%APPDATA%\.KubikLauncher</code> и папку с игровыми данными. Данные функций друзей удаляются вместе с профилем на стороне Firebase по запросу.</p>
+
+  <div class="card">
+    <p style="margin:0"><b>Вопросы по данным</b></p>
+    <p class="muted" style="margin:8px 0 0">Напишите в <a href="https://github.com/NAME-studio/kubik-launcher/issues" style="color:var(--accent);text-decoration:none">GitHub Issues</a> — отвечаем там же.</p>
+  </div>
+
+  <footer>
+    <p><a href="index.html">Kubik Launcher</a> · <a href="https://github.com/NAME-studio/kubik-launcher">Исходный код</a> · Лицензия MIT</p>
+  </footer>
+</div>
+</body>
+</html>

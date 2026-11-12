@@ -1,0 +1,90 @@
+name: build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build installer and portable
+        run: npm run dist -- --publish never
+
+      - name: Pack portable ZIP and checksums
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.value }}"
+          $zip = "release/KubikLauncher-$version-portable.zip"
+          tar -a -c -f $zip -C release/win-unpacked .
+          $files = @(
+            "release/KubikLauncher-Setup-$version.exe",
+            $zip
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLower()
+            "$hash  $(Split-Path $file -Leaf)"
+          }
+          $lines | Set-Content -Encoding ascii release/SHA256SUMS.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KubikLauncher-${{ steps.version.outputs.value }}-windows
+          path: |
+            release/KubikLauncher-Setup-*.exe
+            release/KubikLauncher-Setup-*.exe.blockmap
+            release/KubikLauncher-*-portable.zip
+            release/SHA256SUMS.txt
+            release/latest.yml
+          if-no-files-found: error
+
+      - name: Attach files to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ steps.version.outputs.value }}"
+          $tag = "v$version"
+          $assets = @(
+            "release/KubikLauncher-Setup-$version.exe",
+            "release/KubikLauncher-Setup-$version.exe.blockmap",
+            "release/KubikLauncher-$version-portable.zip",
+            "release/SHA256SUMS.txt",
+            "release/latest.yml"
+          )
+          $existing = gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            $notes = "release/notes-$version.md"
+            if (Test-Path $notes) {
+              gh release create $tag --title "Kubik Launcher $version" --notes-file $notes
+            } else {
+              gh release create $tag --title "Kubik Launcher $version" --notes "Kubik Launcher $version"
+            }
+          }
+          foreach ($asset in $assets) {
+            gh release upload $tag $asset --clobber
+          }

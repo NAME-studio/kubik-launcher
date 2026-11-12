@@ -22,6 +22,9 @@
 Установщик 1.1.9 проверен в VirusTotal:
 [отчёт по файлу](https://www.virustotal.com/gui/file/6c558ae8cf7a91a3c87ed9be9a5b291d316632918f46e3c5e6e52319afec948f).
 
+Политика конфиденциальности: [docs/privacy.html](https://name-studio.github.io/kubik-launcher/privacy.html).
+Подпись кода предоставляется [SignPath Foundation](https://signpath.org/).
+
 ## Что умеет
 
 - **Профили.** У каждой сборки своя папка `instances/<id>/.minecraft`: моды, ресурспаки, шейдеры, миры, настройки и логи не пересекаются. Обложки, память, разрешение окна, Java и аргументы — отдельно на профиль.
