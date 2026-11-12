@@ -541,7 +541,7 @@ window.Views.skins = (() => {
         page = 0;
         done = false;
         UI.clear(grid);
-        load(false);
+        load(false, true);
       },
     }, UI.icon('refresh'));
     let page = 0;
@@ -549,12 +549,16 @@ window.Views.skins = (() => {
     let done = false;
     let total = 0;
 
-    const load = async (next) => {
+    const load = async (next, force) => {
       if (loading || (next && done)) return;
       loading = true;
       status.textContent = next ? 'Подгружаю ещё скины…' : 'Загружаю каталог скинов…';
+      const slowTimer = setTimeout(() => {
+        if (!loading || grid.children.length) return;
+        status.textContent = 'MineSkin отвечает медленно — ждём ещё немного…';
+      }, 2500);
       try {
-        const result = await UI.req(window.api.skins.catalog({ page: next ? page + 1 : 1, size: 24 }));
+        const result = await UI.req(window.api.skins.catalog({ page: next ? page + 1 : 1, size: 24, refresh: Boolean(force) }));
         if (!next) UI.clear(grid);
         page = result.page || (next ? page + 1 : 1);
         total = result.total || total;
@@ -585,6 +589,7 @@ window.Views.skins = (() => {
         done = false;
         status.textContent = `Каталог недоступен: ${error.message} — прокрутите, чтобы попробовать снова`;
       } finally {
+        clearTimeout(slowTimer);
         loading = false;
         requestAnimationFrame(() => followUp());
       }
@@ -759,10 +764,13 @@ window.Views.skins = (() => {
       const friendsStrip = UI.el('div', { class: 'skin-friends' });
       let friendsTimer = null;
 
-      const loadFriendSkins = async () => {
-        friendsStrip.innerHTML = '';
-        try {
-          const data = await UI.req(window.api.friends.state());
+    const loadFriendSkins = async () => {
+      friendsStrip.innerHTML = '';
+      try {
+        const cached = App.state.friends;
+        const data = cached && Array.isArray(cached.friends)
+          ? cached
+          : await UI.req(window.api.friends.state());
           const list = (data.friends || []).filter((friend) => friend.name).slice(0, 10);
           if (!list.length) {
             friendsStrip.append(UI.el('div', { class: 'skin-sub', text: 'Настройте друзей на вкладке «Друзья» — их скины появятся здесь.' }));
@@ -843,12 +851,18 @@ window.Views.skins = (() => {
         modelButtons,
         UI.el('div', { class: 'skin-actions' }, primaryBtn, refreshBtn, downloadBtn),
         detailsBtn,
-        UI.el('div', { class: 'divider' }),
-        UI.el('div', { class: 'field', style: { width: '100%' } }, UI.el('label', {}, 'Посмотреть скин другого игрока'), nickInput),
-        UI.el('button', {
-          class: 'btn sm block',
+      );
+
+      const playerCard = UI.el(
+        'div',
+        { class: 'card pad', style: { marginTop: '16px' } },
+        UI.el('div', { class: 'card-head', style: { marginBottom: '10px' } },
+          UI.el('div', { class: 'card-title' }, UI.icon('user'), 'Другой игрок'),
+        ),
+        UI.el('div', { class: 'vanilla-row' }, nickInput, UI.el('button', {
+          class: 'btn sm primary',
           onclick: () => showSkin(nickInput.value.trim()),
-        }, UI.icon('search'), 'Показать'),
+        }, UI.icon('search'), 'Показать')),
         UI.el('div', { class: 'skin-sub', text: 'Скины друзей' }),
         friendsStrip,
       );
@@ -897,8 +911,9 @@ window.Views.skins = (() => {
         tabsBar.append(button);
       }
 
-      const rightColumn = UI.el('div', { class: 'skins-main' }, editorCard, tabsBar, tabHost);
+      const rightColumn = UI.el('div', { class: 'skins-main' }, editorCard, playerCard);
       container.append(UI.el('div', { class: 'skins-layout' }, left, rightColumn));
+      container.append(tabsBar, tabHost);
       setTab(activeTab);
 
       editor = new window.SkinEditor({

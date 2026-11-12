@@ -169,6 +169,14 @@ function emit(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
 }
 
+function forgetLastInstance(removedIds) {
+  const settings = store.getSettings();
+  const removed = Array.isArray(removedIds) ? removedIds : [removedIds];
+  if (!settings.lastInstance || !removed.includes(settings.lastInstance)) return;
+  const rest = instances.listInstances();
+  store.saveSettings({ lastInstance: (rest[0] && rest[0].id) || '' });
+}
+
 function wrap(handler) {
   return async (event, ...args) => {
     try {
@@ -544,6 +552,7 @@ function registerIpc() {
   ipcMain.handle('instances:create', wrap((options) => instances.createInstance(options)));
   ipcMain.handle('instances:update', wrap(({ id, patch }) => instances.updateInstance(id, patch)));
   ipcMain.handle('instances:delete', wrap(async ({ id }) => {
+    if (launcher.isRunning(id)) throw new Error('Сначала закройте игру — сборка запущена');
     const instance = instances.readInstance(id);
     if (instance && instance.sharedPack) {
       try {
@@ -552,7 +561,9 @@ function registerIpc() {
         /* облако недоступно — удаляем локально */
       }
     }
-    return instances.deleteInstance(id);
+    const removed = instances.deleteInstance(id);
+    if (removed) forgetLastInstance([id]);
+    return removed;
   }));
   ipcMain.handle('instances:duplicate', wrap(({ id }) => instances.duplicateInstance(id)));
   ipcMain.handle('instances:size', wrap(({ id }) => instances.instanceSize(id)));
@@ -714,7 +725,25 @@ function registerIpc() {
     }),
   );
 
-  ipcMain.handle('instances:delete-many', wrap(({ ids }) => instances.deleteInstances(ids, true)));
+  ipcMain.handle('instances:delete-many', wrap(async ({ ids }) => {
+    const list = Array.isArray(ids) ? ids.filter(Boolean) : [];
+    for (const id of list) {
+      if (launcher.isRunning(id)) throw new Error('Сначала закройте игру — одна из сборок запущена');
+    }
+    for (const id of list) {
+      const instance = instances.readInstance(id);
+      if (instance && instance.sharedPack) {
+        try {
+          await friends.leavePack({ packId: instance.sharedPack });
+        } catch {
+          /* облако недоступно — удаляем локально */
+        }
+      }
+    }
+    const removed = instances.deleteInstances(list, true);
+    if (removed.length) forgetLastInstance(removed);
+    return removed;
+  }));
 
   ipcMain.handle('servers:list', wrap(() => store.getSettings().servers || []));
   ipcMain.handle(
@@ -768,7 +797,7 @@ function registerIpc() {
   );
   ipcMain.handle('skins:open-site', wrap(() => shell.openExternal('https://ely.by/skins')));
   ipcMain.handle('skins:fetch', wrap(({ nick }) => skinhub.fetchByNick(nick)));
-  ipcMain.handle('skins:catalog', wrap(({ page, size }) => skinhub.browse({ page, size })));
+  ipcMain.handle('skins:catalog', wrap(({ page, size, refresh }) => skinhub.browse({ page, size, refresh })));
   ipcMain.handle('skins:gallery', wrap(() => skinhub.gallery()));
   ipcMain.handle('skins:gallery-save', wrap(({ dataUrl, name }) => skinhub.saveToGallery({ dataUrl, name })));
   ipcMain.handle('skins:gallery-remove', wrap(({ name }) => skinhub.removeFromGallery({ name })));
@@ -872,6 +901,7 @@ app.whenReady().then(() => {
   });
 
   setTimeout(() => {
+    skinhub.browse({ page: 1, size: 24 }).catch(() => {});
     const settings = store.getSettings();
     const instance = instances.listInstances().find((item) => item.id === settings.lastInstance);
     if (!instance) return;

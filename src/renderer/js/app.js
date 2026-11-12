@@ -917,7 +917,11 @@
       App.state.accounts = { current: data.accounts.current, list: data.accounts.list || [] };
       App.state.currentAccount = (data.accounts.list || []).find((a) => a.id === data.accounts.current) || null;
       App.state.instances = await UI.req(window.api.instances.list());
-      App.state.selectedInstanceId = App.state.settings.lastInstance || (App.state.instances[0] && App.state.instances[0].id) || null;
+      const wantedInstance = App.state.settings.lastInstance;
+      const instanceExists = Boolean(wantedInstance) && App.state.instances.some((item) => item.id === wantedInstance);
+      App.state.selectedInstanceId = instanceExists
+        ? wantedInstance
+        : (App.state.instances[0] && App.state.instances[0].id) || null;
       UI.req(window.api.java.list())
         .then((list) => {
           App.state.javaList = list || [];
