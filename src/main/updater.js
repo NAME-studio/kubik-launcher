@@ -111,12 +111,42 @@ function install() {
   if (!autoUpdater || state.status !== 'ready') return false;
   setImmediate(() => {
     try {
-      autoUpdater.quitAndInstall(false, true);
+      autoUpdater.quitAndInstall(true, true);
     } catch (error) {
       setStatus({ status: 'error', error: cleanError(error) });
     }
   });
   return true;
+}
+
+const notesCache = new Map();
+
+async function notes(version) {
+  const tag = String(version || '').trim();
+  if (!tag) return null;
+  if (notesCache.has(tag)) return notesCache.get(tag);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`https://api.github.com/repos/NAME-studio/kubik-launcher/releases/tags/v${tag}`, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'KubikLauncher' },
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    const result = {
+      version: tag,
+      name: String(data.name || `Kubik Launcher ${tag}`),
+      body: String(data.body || '').slice(0, 6000),
+      url: String(data.html_url || ''),
+    };
+    notesCache.set(tag, result);
+    return result;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function waitDownloaded(timeout = 300000) {
@@ -151,52 +181,11 @@ async function promptOnStart(window) {
     return false;
   }
   if (state.status !== 'available' || !state.available) return false;
-
   const settings = store.getSettings();
   const seen = (settings.updatePromptSeen && settings.updatePromptSeen[state.available]) || 0;
   if (Date.now() - seen < 24 * 60 * 60 * 1000) return false;
-  store.saveSettings({
-    updatePromptSeen: { ...(settings.updatePromptSeen || {}), [state.available]: Date.now() },
-  });
-
-  const answer = await ask(window, {
-    type: 'info',
-    title: 'Доступно обновление',
-    message: `Kubik Launcher ${state.available}`,
-    detail: `Сейчас установлена версия ${app.getVersion()}. Скачать и установить обновление сейчас?`,
-    buttons: ['Обновить', 'Позже'],
-    defaultId: 0,
-    cancelId: 1,
-    noLink: true,
-  });
-  if (answer.response !== 0) return false;
-
-  await download();
-  const ready = await waitDownloaded();
-  if (!ready) {
-    await ask(window, {
-      type: 'warning',
-      title: 'Обновление не скачалось',
-      message: state.error || 'Не удалось скачать обновление',
-      detail: 'Можно повторить позже в настройках.',
-      buttons: ['Понятно'],
-      noLink: true,
-    });
-    return false;
-  }
-
-  const restart = await ask(window, {
-    type: 'info',
-    title: 'Обновление готово',
-    message: 'Перезапустить лаунчер сейчас?',
-    detail: 'Обновление установится при перезапуске.',
-    buttons: ['Перезапустить', 'Позже'],
-    defaultId: 0,
-    cancelId: 1,
-    noLink: true,
-  });
-  if (restart.response === 0) install();
+  if (window && !window.isDestroyed()) window.webContents.send('update:prompt', { ...state });
   return true;
 }
 
-module.exports = { init, getState, check, download, install, promptOnStart };
+module.exports = { init, getState, check, download, install, notes, promptOnStart };

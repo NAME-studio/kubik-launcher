@@ -897,6 +897,128 @@
       const view = App.currentView();
       if (view && view.onEvent) view.onEvent('state', payload);
     });
+
+    const updateUi = { dialog: null, bar: null, fill: null, hint: null, primary: null };
+
+    const markUpdateSeen = (version) => {
+      const seen = { ...((App.state.settings && App.state.settings.updatePromptSeen) || {}), [version]: Date.now() };
+      App.state.settings = { ...(App.state.settings || {}), updatePromptSeen: seen };
+      window.api.settings.save({ updatePromptSeen: seen }).catch(() => {});
+    };
+
+    const renderUpdateState = (state) => {
+      if (!state || !updateUi.dialog) return;
+      updateUi.status = state.status;
+      const { bar, fill, hint, primary } = updateUi;
+      if (state.status === 'downloading') {
+        bar.style.display = 'block';
+        fill.style.width = `${state.progress || 0}%`;
+        hint.textContent = `Скачиваем обновление — ${state.progress || 0} %`;
+        primary.disabled = true;
+        primary.textContent = 'Скачиваем…';
+        return;
+      }
+      if (state.status === 'ready') {
+        bar.style.display = 'block';
+        fill.style.width = '100%';
+        hint.textContent = 'Готово. Лаунчер закроется, обновится и запустится сам.';
+        primary.disabled = false;
+        primary.textContent = 'Перезапустить и обновить';
+        return;
+      }
+      if (state.status === 'error') {
+        hint.textContent = state.error || 'Не удалось скачать обновление';
+        primary.disabled = false;
+        primary.textContent = 'Повторить';
+      }
+    };
+
+    const openUpdateDialog = async (state) => {
+      if (!state || state.status !== 'available' || !state.available || updateUi.dialog) return;
+      if (state.supported === false) return;
+      const version = state.available;
+      const seen = ((App.state.settings && App.state.settings.updatePromptSeen) || {})[version] || 0;
+      if (Date.now() - seen < 24 * 60 * 60 * 1000) return;
+      markUpdateSeen(version);
+
+      const notes = UI.el('div', { class: 'update-notes tiny' });
+      const bar = UI.el('div', { class: 'update-bar' }, UI.el('div', { class: 'update-bar-fill' }));
+      bar.style.display = 'none';
+      const hint = UI.el('p', { class: 'tiny muted', text: 'Обновление скачается в фоне, после чего лаунчер перезапустится сам.' });
+      const body = UI.el(
+        'div',
+        { class: 'stack', style: { gap: '12px' } },
+        UI.el(
+          'div',
+          { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } },
+          UI.el('span', { class: 'badge', text: `сейчас ${state.version}` }),
+          UI.el('span', { class: 'badge accent', text: `новая ${version}` }),
+        ),
+        notes,
+        bar,
+        hint,
+      );
+
+      const dialog = UI.modal({
+        title: `Обновление ${version}`,
+        subtitle: 'Новая версия Kubik Launcher',
+        body,
+        actions: [
+          { label: 'Позже', kind: 'ghost' },
+          {
+            label: 'Скачать и установить',
+            kind: 'primary',
+            icon: 'download',
+            onClick: async () => {
+              const primary = updateUi.primary;
+              if (updateUi.status === 'ready') {
+                window.api.update.install();
+                return false;
+              }
+              if (primary) {
+                primary.disabled = true;
+                primary.textContent = 'Скачиваем…';
+              }
+              try {
+                const next = await UI.req(window.api.update.download());
+                renderUpdateState(next);
+              } catch (error) {
+                if (updateUi.hint) updateUi.hint.textContent = error.message;
+                if (primary) {
+                  primary.disabled = false;
+                  primary.textContent = 'Повторить';
+                }
+              }
+              return false;
+            },
+          },
+        ],
+        onClose: () => {
+          updateUi.dialog = null;
+          updateUi.primary = null;
+        },
+      });
+
+      updateUi.dialog = dialog;
+      updateUi.bar = bar;
+      updateUi.fill = bar.firstChild;
+      updateUi.hint = hint;
+      updateUi.status = state.status;
+      updateUi.primary = dialog.actions[1] ? dialog.actions[1].node : null;
+
+      try {
+        const data = await window.api.update.notes(version);
+        if (data && data.body) notes.innerHTML = UI.md(data.body);
+        else notes.textContent = 'Список изменений — в описании релиза на GitHub.';
+      } catch {
+        notes.textContent = 'Список изменений — в описании релиза на GitHub.';
+      }
+    };
+
+    App.showUpdatePrompt = openUpdateDialog;
+    App.applyUpdateState = renderUpdateState;
+    window.api.update.onStatus(renderUpdateState);
+    window.api.update.onPrompt((state) => openUpdateDialog(state));
   }
 
   async function boot() {
@@ -935,6 +1057,12 @@
       updateAccountCard();
       renderPage();
       window.__bootMs = Math.round(performance.now());
+      if (App.showUpdatePrompt) {
+        window.api.update
+          .state()
+          .then((state) => App.showUpdatePrompt(state))
+          .catch(() => {});
+      }
       if (App.state.settings.firstRun && window.Views.onboarding) {
         window.Views.onboarding.open(() => App.refresh());
       }

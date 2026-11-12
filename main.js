@@ -409,6 +409,7 @@ function registerIpc() {
   ipcMain.handle('update:check', wrap(() => updater.check()));
   ipcMain.handle('update:download', wrap(() => updater.download()));
   ipcMain.handle('update:install', wrap(() => updater.install()));
+  ipcMain.handle('update:notes', wrap(({ version }) => updater.notes(version)));
 
   ipcMain.handle('friends:state', wrap(() => friends.state()));
   ipcMain.handle('friends:setup', wrap(({ name, about }) => friends.setup({ name, about })));

@@ -28,16 +28,34 @@ function hasKey() {
 
 async function request(endpoint, params) {
   const key = apiKey();
-  if (!key) throw new Error('Нужен API-ключ CurseForge — вставьте его в настройках (console.curseforge.com)');  const url = new URL(`${API}${endpoint}`);
+  if (!key) {
+    const error = new Error('Нужен API-ключ CurseForge — вставьте его в настройках (console.curseforge.com)');
+    error.code = 'CF_NO_KEY';
+    throw error;
+  }
+  const url = new URL(`${API}${endpoint}`);
   for (const [name, value] of Object.entries(params || {})) {
     if (value === undefined || value === null || value === '') continue;
     url.searchParams.set(name, String(value));
   }
-  const response = await net.request(url.toString(), { headers: { 'x-api-key': key, Accept: 'application/json' } });
-  if (response.status === 403 || response.status === 401) {
-    throw new Error('CurseForge недоступен из вашей сети (Cloudflare 403) или ключ отклонён — попробуйте VPN или другой ключ');
+  let response;
+  try {
+    response = await net.request(url.toString(), { headers: { 'x-api-key': key, Accept: 'application/json' }, timeout: 12000 });
+  } catch (error) {
+    const failure = new Error('CurseForge не отвечает — проверьте интернет или VPN и попробуйте ещё раз');
+    failure.code = 'CF_NETWORK';
+    throw failure;
   }
-  if (!response.ok) throw new Error(`CurseForge ответил ${response.status}`);
+  if (response.status === 403 || response.status === 401) {
+    const error = new Error('CurseForge недоступен из вашей сети (Cloudflare 403) или ключ отклонён — попробуйте VPN или другой ключ');
+    error.code = 'CF_FORBIDDEN';
+    throw error;
+  }
+  if (!response.ok) {
+    const error = new Error(`CurseForge ответил ${response.status} — попробуйте позже`);
+    error.code = 'CF_HTTP';
+    throw error;
+  }
   return response.json();
 }
 

@@ -50,6 +50,34 @@ function nodeRequest(url, options = {}) {
 const USER_AGENT = 'KubikLauncher/1.0.0 (Minecraft launcher; +https://github.com/kubik-launcher)';
 const DEFAULT_HEADERS = { 'User-Agent': USER_AGENT };
 
+function networkError(url, cause) {
+  const error = new Error('Нет связи с сервером — проверьте интернет или VPN');
+  error.code = 'NETWORK';
+  error.url = url;
+  error.cause = cause;
+  return error;
+}
+
+function toFriendly(url, error) {
+  const raw = String((error && (error.code || error.message)) || '');
+  if (/fetch failed|ENOTFOUND|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ECONNREFUSED|EPIPE|socket hang up|aborted/i.test(raw)) {
+    return networkError(url, error);
+  }
+  return error;
+}
+
+function adaptNodeResponse(url, fallback) {
+  const text = fallback.body ? fallback.body.toString('utf8') : '';
+  return {
+    ok: fallback.status >= 200 && fallback.status < 300,
+    status: fallback.status,
+    headers: fallback.headers || {},
+    url,
+    text: async () => text,
+    json: async () => JSON.parse(text),
+  };
+}
+
 async function request(url, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeout || 30000);
@@ -62,6 +90,12 @@ async function request(url, options = {}) {
       redirect: 'follow',
     });
     return response;
+  } catch (error) {
+    try {
+      return adaptNodeResponse(url, await nodeRequest(url, options));
+    } catch (fallbackError) {
+      throw networkError(url, fallbackError);
+    }
   } finally {
     clearTimeout(timeout);
   }
@@ -74,7 +108,12 @@ async function fetchJson(url, options = {}) {
     response = await request(url, options);
     text = await response.text();
   } catch (error) {
-    const fallback = await nodeRequest(url, options);
+    let fallback;
+    try {
+      fallback = await nodeRequest(url, options);
+    } catch (fallbackError) {
+      throw toFriendly(url, fallbackError);
+    }
     response = { ok: fallback.status >= 200 && fallback.status < 300, status: fallback.status };
     text = fallback.body.toString('utf8');
   }
@@ -102,7 +141,12 @@ async function fetchText(url, options = {}) {
     if (!response.ok) throw new Error(`HTTP ${response.status} для ${url}`);
     return text;
   } catch (error) {
-    const fallback = await nodeRequest(url, options);
+    let fallback;
+    try {
+      fallback = await nodeRequest(url, options);
+    } catch (fallbackError) {
+      throw toFriendly(url, fallbackError);
+    }
     if (fallback.status < 200 || fallback.status >= 300) throw new Error(`HTTP ${fallback.status} для ${url}`);
     return fallback.body.toString('utf8');
   }
@@ -161,7 +205,7 @@ async function downloadFile(url, dest, options = {}) {
       clearTimeout(timer);
     }
   }
-  throw lastError || new Error(`Не удалось скачать ${url}`);
+  throw toFriendly(url, lastError || new Error(`Не удалось скачать ${url}`));
 }
 
 async function pool(items, concurrency, worker, onProgress) {

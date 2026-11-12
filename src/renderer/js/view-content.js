@@ -72,6 +72,7 @@ window.Views.contentView = (config) => {
     const params = searchParams(append ? s.hits.length : 0);
     s.loading = true;
     s.lastError = null;
+    s.lastErrorCode = null;
     if (!append) {
       s.hits = [];
       s.total = 0;
@@ -105,9 +106,10 @@ window.Views.contentView = (config) => {
     } catch (error) {
       if (token === s.token) {
         s.lastError = error.message;
+        s.lastErrorCode = error.code || null;
         renderResults();
         UI.toast(
-          s.source === 'curse' ? `CurseForge: ${error.message}` : `Modrinth не ответил: ${error.message}`,
+          s.source === 'curse' ? error.message : `Modrinth не ответил: ${error.message}`,
           'error',
           7000,
         );
@@ -276,16 +278,29 @@ window.Views.contentView = (config) => {
 
     if (!s.hits.length) {
       if (s.lastError) {
+        const code = s.lastErrorCode || '';
+        const needsKey = code === 'CF_NO_KEY' || (s.source === 'curse' && !code && /API-ключ/.test(s.lastError || ''));
+        const title = needsKey
+          ? 'CurseForge требует API-ключ'
+          : s.source === 'curse'
+            ? (code === 'CF_NETWORK'
+                ? 'Нет связи с CurseForge'
+                : code === 'CF_FORBIDDEN'
+                  ? 'CurseForge недоступен в вашей сети'
+                  : 'CurseForge временно недоступен')
+            : 'Каталог недоступен';
         host.append(
           UI.el('div', { class: 'card empty' },
-            UI.el('h3', {}, s.source === 'curse' ? 'CurseForge требует API-ключ' : 'Каталог недоступен'),
+            UI.el('h3', {}, title),
             UI.el('p', {}, s.lastError),
-            s.source === 'curse'
-              ? UI.el('button', {
-                  class: 'btn sm primary',
-                  onclick: () => App.go('settings'),
-                }, UI.icon('settings'), 'Открыть настройки')
-              : null,
+            UI.el('div', { class: 'row', style: { gap: '8px', justifyContent: 'center' } },
+              needsKey
+                ? UI.el('button', { class: 'btn sm primary', onclick: () => App.go('settings') }, UI.icon('settings'), 'Открыть настройки')
+                : UI.el('button', { class: 'btn sm primary', onclick: () => search(false) }, UI.icon('refresh'), 'Повторить'),
+              needsKey
+                ? UI.el('button', { class: 'btn sm', onclick: () => search(false) }, UI.icon('refresh'), 'Повторить')
+                : null,
+            ),
           ),
         );
         return;

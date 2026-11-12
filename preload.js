@@ -95,10 +95,16 @@ contextBridge.exposeInMainWorld('api', {
     check: () => invoke('update:check'),
     download: () => invoke('update:download'),
     install: () => invoke('update:install'),
+    notes: (version) => invoke('update:notes', { version }),
     onStatus: (handler) => {
       const listener = (_event, payload) => handler(payload);
       ipcRenderer.on('update:status', listener);
       return () => ipcRenderer.removeListener('update:status', listener);
+    },
+    onPrompt: (handler) => {
+      const listener = (_event, payload) => handler(payload);
+      ipcRenderer.on('update:prompt', listener);
+      return () => ipcRenderer.removeListener('update:prompt', listener);
     },
   },
 
