@@ -190,6 +190,92 @@
     return false;
   };
 
+  App.showLaunchError = (instance, error) => {
+    const logFile = (error && error.logFile) || '';
+    const instanceId = instance && instance.id;
+    const message = (error && error.message) || 'Неизвестная ошибка';
+    if (error && error.code === 'another-running') {
+      const activeName = (error.meta && error.meta.instanceName) || 'другая сборка';
+      return UI.modal({
+        title: 'Сначала закройте игру',
+        subtitle: `Сейчас запущена «${activeName}». Из одного лаунчера одновременно работает только одна сборка.`,
+        body: UI.el(
+          'div',
+          { class: 'stack', style: { gap: '10px' } },
+          UI.el('div', { class: 'notice' }, UI.icon('alert'), UI.el('span', { text: message })),
+          UI.el('div', {
+            style: { fontSize: '13px', opacity: '0.75' },
+            text: 'Можно остановить её и сразу запустить выбранную сборку.',
+          }),
+        ),
+        actions: [
+          { label: 'Отмена', kind: 'ghost' },
+          {
+            label: 'Остановить и запустить',
+            kind: 'primary',
+            onClick: async () => {
+              try {
+                await UI.req(window.api.game.stopAll());
+                App.state.running = {};
+                UI.toast('Игра остановлена — запускаю другую сборку', 'info');
+                setTimeout(() => App.launchInstance(instance), 400);
+              } catch (stopError) {
+                UI.toast(stopError.message, 'error');
+              }
+              return false;
+            },
+          },
+        ],
+      });
+    }
+    const body = UI.el(
+      'div',
+      { class: 'stack', style: { gap: '12px' } },
+      UI.el('div', { class: 'notice' }, UI.icon('alert'), UI.el('span', { text: message })),
+      logFile
+        ? UI.el('div', { style: { fontSize: '12px', opacity: '0.72', wordBreak: 'break-all' }, text: logFile })
+        : null,
+    );
+    const actions = [];
+    if (logFile) {
+      actions.push({
+        label: 'Скопировать лог',
+        onClick: async () => {
+          try {
+            const result = await UI.req(window.api.game.copyLog(logFile));
+            UI.toast(`Лог скопирован (${result.chars} символов)`, 'success');
+          } catch (copyError) {
+            UI.toast(copyError.message, 'error');
+          }
+          return false;
+        },
+      });
+      actions.push({
+        label: 'Открыть лог',
+        onClick: () => {
+          window.api.openPath(logFile);
+          return false;
+        },
+      });
+    }
+    if (instanceId) {
+      actions.push({
+        label: 'Открыть папку сборки',
+        onClick: () => {
+          window.api.instances.openFolder(instanceId);
+          return false;
+        },
+      });
+    }
+    actions.push({ label: 'Закрыть', kind: 'primary' });
+    return UI.modal({
+      title: 'Не удалось запустить игру',
+      subtitle: 'Можно сразу посмотреть лог или открыть папку сборки',
+      body,
+      actions,
+    });
+  };
+
   App.launchInstance = async (instance) => {
     if (!instance) return;
     if (!App.requireAccount('Выберите аккаунт, чтобы играть')) return;
@@ -229,7 +315,7 @@
       setTimeout(() => modal.close(), 1200);
     } catch (error) {
       modal.close();
-      UI.toast(error.message, 'error', 9000);
+      App.showLaunchError(instance, error);
     } finally {
       offProgress();
     }

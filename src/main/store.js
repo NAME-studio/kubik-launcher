@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS = {
   microsoftClientId: '',
   launchHideMigrated: false,
   sounds: true,
+  translateDescriptions: true,
   servers: [],
   discordClientId: '1569701499238490122',
   discordRichPresence: true,
@@ -47,6 +48,7 @@ const DEFAULT_SETTINGS = {
   firebaseApiKey: '',
   firebaseProjectId: '',
   curseforgeKey: '',
+  javaCache: { byMajor: {} },
 };
 
 let settings = { ...DEFAULT_SETTINGS };

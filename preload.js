@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('api', {
   info: () => invoke('app:info'),
   openExternal: (url) => invoke('app:open-external', { url }),
   openPath: (target) => invoke('app:open-path', { target }),
+  copyText: (text) => invoke('app:copy-text', { text }),
   pickFolder: (title) => invoke('app:pick-folder', { title }),
   setAutostart: (enabled) => invoke('app:set-autostart', { enabled }),
 
@@ -66,6 +67,8 @@ contextBridge.exposeInMainWorld('api', {
     duplicate: (id) => invoke('instances:duplicate', { id }),
     size: (id) => invoke('instances:size', { id }),
     openFolder: (id) => invoke('instances:open-folder', { id }),
+    exportPack: (id, withSaves) => invoke('instances:export', { id, withSaves }),
+    importPack: () => invoke('instances:import'),
     options: (id) => invoke('instances:options-get', { id }),
     saveOptions: (id, patch) => invoke('instances:options-save', { id, patch }),
   },
@@ -73,10 +76,12 @@ contextBridge.exposeInMainWorld('api', {
   game: {
     install: (instanceId) => invoke('game:install', { instanceId }),
     prepareAll: () => invoke('game:prepare-all'),
-    launch: (instanceId) => invoke('game:launch', { instanceId }),
+    launch: (instanceId, server) => invoke('game:launch', { instanceId, server }),
     stop: (instanceId) => invoke('game:stop', { instanceId }),
+    stopAll: () => invoke('game:stop-all'),
     running: (instanceId) => invoke('game:running', { instanceId }),
     diagnose: (logFile, extra) => invoke('game:diagnose', { logFile, extra }),
+    copyLog: (logFile) => invoke('game:copy-log', { logFile }),
   },
 
   rpc: {
@@ -147,6 +152,7 @@ contextBridge.exposeInMainWorld('api', {
     curseInstall: (instanceId, modId, projectType) => invoke('content:curse-install', { instanceId, modId, projectType }),
     search: (options) => invoke('content:search', options),
     project: (id) => invoke('content:project', { id }),
+    translate: (text, to) => invoke('content:translate', { text, to }),
     versions: (id, gameVersion, loader) => invoke('content:versions', { id, gameVersion, loader }),
     installed: (instanceId) => invoke('content:installed', { instanceId }),
     install: (instanceId, projectId, versionId) => invoke('content:install', { instanceId, projectId, versionId }),

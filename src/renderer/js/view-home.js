@@ -136,9 +136,10 @@ window.Views.home = (() => {
         setProgress({ percent: 100, detail: 'Игра запущена' });
         setTimeout(() => setProgress(null), 2500);
       } catch (error) {
-        UI.toast(error.message, 'error', 9000);
         setProgress(null);
         playButton.disabled = false;
+        if (App.showLaunchError) App.showLaunchError(instance, error);
+        else UI.toast(error.message, 'error', 9000);
       } finally {
         offProgress();
       }

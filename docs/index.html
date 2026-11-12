@@ -4,148 +4,231 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Kubik Launcher — лаунчер Minecraft для Windows</title>
-<meta name="description" content="Kubik Launcher — бесплатный лаунчер Minecraft для Windows: отдельные профили, Fabric, Forge, NeoForge и Quilt, каталог Modrinth, аккаунты Ely.by, редактор скинов с 3D-просмотром." />
+<meta name="description" content="Kubik Launcher — бесплатный лаунчер Minecraft для Windows: запуск за пару секунд, отдельные профили, Fabric, Forge, NeoForge и Quilt, каталог Modrinth, аккаунты Ely.by, редактор скинов с 3D-просмотром." />
 <meta property="og:title" content="Kubik Launcher" />
-<meta property="og:description" content="Лаунчер Minecraft для Windows: профили, загрузчики модов, Modrinth, скины с 3D-редактором." />
+<meta property="og:description" content="Лаунчер Minecraft для Windows: запуск за пару секунд, профили, загрузчики модов, Modrinth, скины с 3D-редактором." />
 <meta property="og:image" content="screenshots/home.jpg" />
-<meta name="theme-color" content="#0a0e14" />
+<meta name="theme-color" content="#070a0f" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 28 9.5v13L16 29 4 22.5v-13L16 3Z' fill='%238ce86a'/%3E%3C/svg%3E" />
 <style>
   :root {
-    --bg: #080b10;
-    --bg-soft: #0d131c;
-    --panel: #111a25;
-    --panel-2: #16212e;
-    --line: #223040;
-    --text: #e9f1fa;
-    --muted: #94a6ba;
-    --muted-2: #6c7f94;
+    --bg: #070a0f;
+    --bg-2: #0a1017;
+    --panel: #101823;
+    --panel-2: #16202d;
+    --line: #1e2b3a;
+    --line-soft: rgba(30, 43, 58, 0.65);
+    --text: #eaf2fb;
+    --muted: #93a5b9;
+    --muted-2: #67798e;
     --accent: #8ce86a;
     --accent-2: #35c9a1;
-    --accent-ink: #07210f;
-    --radius: 18px;
-    --max: 1120px;
+    --accent-3: #b6ff8f;
+    --ink: #06210f;
+    --radius: 20px;
+    --radius-sm: 14px;
+    --max: 1140px;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
   }
 
   * { box-sizing: border-box; }
 
-  html { scroll-behavior: smooth; }
+  html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 
   body {
     margin: 0;
-    background:
-      radial-gradient(900px 520px at 12% -10%, rgba(140, 232, 106, 0.12), transparent 62%),
-      radial-gradient(760px 460px at 92% 2%, rgba(53, 201, 161, 0.1), transparent 60%),
-      var(--bg);
+    background: var(--bg);
     color: var(--text);
     font-family: "Segoe UI", system-ui, -apple-system, "Inter", Arial, sans-serif;
     font-size: 16px;
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background:
+      radial-gradient(760px 520px at 8% -8%, rgba(140, 232, 106, 0.16), transparent 64%),
+      radial-gradient(680px 460px at 96% 4%, rgba(53, 201, 161, 0.13), transparent 62%),
+      radial-gradient(900px 700px at 50% 118%, rgba(70, 120, 255, 0.08), transparent 70%),
+      var(--bg);
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(circle at 50% 0%, #000 0%, transparent 72%);
+    -webkit-mask-image: radial-gradient(circle at 50% 0%, #000 0%, transparent 72%);
+    opacity: 0.6;
   }
 
   a { color: inherit; }
 
   img { max-width: 100%; height: auto; display: block; }
 
-  .wrap { width: min(var(--max), calc(100% - 40px)); margin: 0 auto; }
+  .wrap { width: min(var(--max), calc(100% - 48px)); margin: 0 auto; }
+
+  /* ── шапка ───────────────────────────────────────── */
 
   .topbar {
     position: sticky;
     top: 0;
-    z-index: 20;
-    backdrop-filter: blur(14px);
-    background: rgba(8, 11, 16, 0.78);
-    border-bottom: 1px solid rgba(34, 48, 64, 0.7);
+    z-index: 40;
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    background: rgba(7, 10, 15, 0.72);
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.25s ease, background 0.25s ease;
   }
 
-  .topbar-inner {
+  .topbar.scrolled {
+    background: rgba(7, 10, 15, 0.9);
+    border-bottom-color: var(--line-soft);
+  }
+
+  .topbar-inner { display: flex; align-items: center; gap: 18px; height: 70px; }
+
+  .brand {
     display: flex;
     align-items: center;
-    gap: 18px;
-    height: 64px;
+    gap: 11px;
+    text-decoration: none;
+    font-weight: 660;
+    letter-spacing: -0.01em;
+    font-size: 16px;
   }
 
-  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 650; letter-spacing: 0.01em; }
-
-  .brand svg { width: 26px; height: 26px; }
+  .brand svg { width: 28px; height: 28px; filter: drop-shadow(0 0 12px rgba(140, 232, 106, 0.45)); }
 
   .brand small {
-    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-family: var(--mono);
     font-size: 11px;
-    color: var(--muted-2);
-    border: 1px solid var(--line);
-    border-radius: 7px;
-    padding: 1px 6px;
+    color: var(--accent-2);
+    border: 1px solid rgba(53, 201, 161, 0.35);
+    background: rgba(53, 201, 161, 0.08);
+    border-radius: 999px;
+    padding: 2px 8px;
     font-weight: 500;
+    letter-spacing: 0;
   }
 
-  .nav { display: flex; gap: 20px; margin-left: auto; }
-  .nav a { color: var(--muted); text-decoration: none; font-size: 14px; }
-  .nav a:hover, .nav a:focus-visible { color: var(--text); }
+  .nav { display: flex; gap: 6px; margin-left: auto; }
+
+  .nav a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: 9px;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+
+  .nav a:hover, .nav a:focus-visible { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+
+  .topbar .btn { margin-left: 6px; }
+
+  /* ── кнопки ──────────────────────────────────────── */
 
   .btn {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 11px 18px;
-    border-radius: 11px;
+    justify-content: center;
+    gap: 9px;
+    padding: 13px 22px;
+    border-radius: 12px;
     border: 1px solid var(--line);
-    background: var(--panel);
+    background: rgba(22, 32, 45, 0.75);
     color: var(--text);
     text-decoration: none;
-    font-size: 14.5px;
-    font-weight: 600;
-    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    font-size: 15px;
+    font-weight: 620;
+    letter-spacing: -0.005em;
+    transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+    white-space: nowrap;
   }
 
-  .btn:hover { background: var(--panel-2); border-color: #2c3d50; }
-  .btn:active { transform: translateY(1px); }
+  .btn:hover { background: var(--panel-2); border-color: #2d4257; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
   .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   .btn.primary {
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    color: var(--accent-ink);
+    background: linear-gradient(135deg, var(--accent-3), var(--accent) 46%, var(--accent-2));
+    color: var(--ink);
     border-color: transparent;
+    box-shadow: 0 12px 34px rgba(94, 214, 128, 0.24);
   }
 
-  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.primary:hover { box-shadow: 0 16px 42px rgba(94, 214, 128, 0.32); filter: brightness(1.04); }
 
-  .btn.small { padding: 8px 14px; font-size: 13px; }
+  .btn.small { padding: 9px 15px; font-size: 13.5px; border-radius: 10px; }
 
-  .hero { padding: 64px 0 34px; }
+  .btn.ghost { background: transparent; }
 
-  .hero-grid {
-    display: block;
-  }
+  /* ── герой ───────────────────────────────────────── */
 
-  .hero-copy {
-    max-width: 780px;
-  }
+  .hero { padding: 74px 0 26px; position: relative; }
+
+  .hero-copy { max-width: 840px; }
 
   .eyebrow {
-    font-size: 12px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--accent-2);
-    margin: 0 0 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 12.5px;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    margin: 0 0 20px;
+    padding: 6px 13px 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(16, 24, 35, 0.7);
+  }
+
+  .eyebrow b {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink);
+    background: linear-gradient(135deg, var(--accent-3), var(--accent-2));
+    padding: 2px 7px;
+    border-radius: 999px;
+    letter-spacing: 0;
   }
 
   h1 {
-    font-size: clamp(38px, 5.2vw, 60px);
+    font-size: clamp(38px, 5.6vw, 66px);
     line-height: 1.02;
-    letter-spacing: -0.035em;
-    margin: 0 0 18px;
-    font-weight: 720;
+    letter-spacing: -0.04em;
+    margin: 0 0 20px;
+    font-weight: 730;
+    text-wrap: balance;
   }
 
-  h1 span { color: var(--accent); }
+  h1 em {
+    font-style: normal;
+    background: linear-gradient(120deg, var(--accent-3) 8%, var(--accent) 42%, var(--accent-2) 92%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 
   .lead {
     font-size: 17.5px;
     color: var(--muted);
-    max-width: 46ch;
-    margin: 0 0 26px;
+    max-width: 60ch;
+    margin: 0 0 30px;
+    line-height: 1.62;
   }
 
   .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
@@ -153,33 +236,65 @@
   .meta {
     display: flex;
     flex-wrap: wrap;
-    gap: 14px;
-    margin-top: 18px;
-    color: var(--muted-2);
-    font-size: 12.5px;
+    gap: 8px;
+    margin-top: 22px;
   }
 
-  .meta span { display: inline-flex; align-items: center; gap: 6px; }
-  .meta span::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--muted-2); }
+  .meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    color: var(--muted);
+    border: 1px solid var(--line-soft);
+    background: rgba(16, 24, 35, 0.6);
+    border-radius: 999px;
+    padding: 5px 11px;
+  }
+
+  .meta span::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent-2);
+    box-shadow: 0 0 8px rgba(53, 201, 161, 0.8);
+    flex: none;
+  }
 
   .shot-frame {
-    margin-top: 40px;
+    margin: 46px 0 0;
     position: relative;
     border-radius: var(--radius);
     border: 1px solid var(--line);
-    background: var(--panel);
+    background: linear-gradient(180deg, var(--panel), var(--bg-2));
     padding: 10px;
-    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+    box-shadow:
+      0 40px 90px rgba(0, 0, 0, 0.55),
+      0 0 0 1px rgba(255, 255, 255, 0.03) inset;
   }
 
-  .shot-frame img { width: 100%; height: auto; border-radius: 11px; }
+  .shot-frame::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(150deg, rgba(140, 232, 106, 0.45), transparent 38%, transparent 66%, rgba(53, 201, 161, 0.4));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  .shot-frame img { width: 100%; border-radius: 12px; }
 
   .shot-frame figcaption {
     display: flex;
     gap: 8px;
     align-items: center;
-    padding: 10px 6px 2px;
-    font-size: 12px;
+    padding: 12px 8px 2px;
+    font-size: 12.5px;
     color: var(--muted-2);
   }
 
@@ -189,36 +304,165 @@
     height: 7px;
     border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 8px rgba(140, 232, 106, 0.7);
+    box-shadow: 0 0 10px rgba(140, 232, 106, 0.8);
   }
 
-  section { padding: 58px 0; }
+  /* ── полоса цифр ─────────────────────────────────── */
 
-  .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    margin: 54px 0 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--line-soft);
+    overflow: hidden;
+  }
+
+  .stat { background: linear-gradient(180deg, rgba(16, 24, 35, 0.95), rgba(10, 16, 23, 0.95)); padding: 24px 22px; }
+
+  .stat .value {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    color: var(--accent);
+  }
+
+  .stat .value small { font-size: 15px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-left: 3px; }
+
+  .stat .label { margin-top: 7px; font-size: 13.2px; color: var(--muted); }
+
+  /* ── секции ──────────────────────────────────────── */
+
+  section { padding: 72px 0; }
+
+  .section-head { margin-bottom: 34px; max-width: 640px; }
+
+  .kicker {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent-2);
+    margin: 0 0 12px;
+  }
 
   h2 {
-    font-size: clamp(26px, 3vw, 34px);
-    letter-spacing: -0.025em;
+    font-size: clamp(27px, 3.2vw, 38px);
+    letter-spacing: -0.03em;
     line-height: 1.1;
-    margin: 0;
+    margin: 0 0 12px;
+    font-weight: 700;
+    text-wrap: balance;
   }
 
-  .section-head p { color: var(--muted); margin: 6px 0 0; max-width: 52ch; font-size: 15px; }
+  .section-head p { color: var(--muted); margin: 0; font-size: 15.5px; max-width: 62ch; }
+
+  /* ── карточки ────────────────────────────────────── */
 
   .features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 
   .feature {
+    position: relative;
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    background: linear-gradient(160deg, var(--panel), var(--bg-soft));
-    padding: 22px;
+    background: linear-gradient(165deg, rgba(22, 32, 45, 0.9), rgba(10, 16, 23, 0.92));
+    padding: 24px;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    overflow: hidden;
   }
 
-  .feature svg { width: 22px; height: 22px; color: var(--accent); }
+  .feature::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(420px 180px at 100% 0%, rgba(140, 232, 106, 0.09), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
 
-  .feature h3 { font-size: 16.5px; margin: 14px 0 6px; letter-spacing: -0.01em; }
+  .feature:hover { transform: translateY(-3px); border-color: #2b3f54; box-shadow: 0 22px 46px rgba(0, 0, 0, 0.34); }
+  .feature:hover::after { opacity: 1; }
 
-  .feature p { margin: 0; color: var(--muted); font-size: 14.2px; }
+  .icon-tile {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(150deg, rgba(140, 232, 106, 0.16), rgba(53, 201, 161, 0.08));
+    border: 1px solid rgba(140, 232, 106, 0.22);
+    color: var(--accent);
+  }
+
+  .icon-tile svg { width: 21px; height: 21px; }
+
+  .feature h3 { font-size: 16.5px; margin: 16px 0 7px; letter-spacing: -0.015em; font-weight: 650; }
+
+  .feature p { margin: 0; color: var(--muted); font-size: 14.2px; line-height: 1.58; }
+
+  /* ── скорость ────────────────────────────────────── */
+
+  .speed {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 18px;
+    align-items: stretch;
+  }
+
+  .speed-panel {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: linear-gradient(165deg, rgba(22, 32, 45, 0.92), rgba(10, 16, 23, 0.94));
+    padding: 30px;
+  }
+
+  .speed-panel h3 { margin: 0 0 10px; font-size: 20px; letter-spacing: -0.02em; }
+
+  .speed-panel > p { margin: 0 0 24px; color: var(--muted); font-size: 14.6px; }
+
+  .speed-list { display: grid; gap: 12px; }
+
+  .speed-item { display: flex; gap: 12px; align-items: flex-start; }
+
+  .speed-item .dot {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    margin-top: 2px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(140, 232, 106, 0.14);
+    border: 1px solid rgba(140, 232, 106, 0.3);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .speed-item strong { display: block; font-size: 14.6px; font-weight: 620; }
+  .speed-item span { color: var(--muted); font-size: 13.6px; }
+
+  .meter { border: 1px solid var(--line); border-radius: var(--radius); background: rgba(10, 16, 23, 0.9); padding: 30px; }
+
+  .meter-title { font-size: 13px; color: var(--muted-2); margin: 0 0 20px; font-family: var(--mono); letter-spacing: 0.04em; }
+
+  .bar { margin-bottom: 16px; }
+
+  .bar-head { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 7px; }
+  .bar-head span:last-child { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+
+  .bar-track { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+
+  .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+  .bar-fill.warm { background: linear-gradient(90deg, #4b7cf3, #7aa2ff); }
+
+  .meter-note { margin: 20px 0 0; font-size: 12.5px; color: var(--muted-2); }
+
+  /* ── галерея ─────────────────────────────────────── */
 
   .gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 
@@ -228,11 +472,29 @@
     border-radius: var(--radius);
     overflow: hidden;
     background: var(--panel);
+    transition: border-color 0.2s ease, transform 0.2s ease;
   }
 
-  .gallery img { width: 100%; height: auto; }
+  .gallery figure:hover { border-color: #2b3f54; transform: translateY(-2px); }
 
-  .gallery figcaption { padding: 12px 16px 14px; color: var(--muted); font-size: 13.5px; }
+  .gallery .wide { grid-column: 1 / -1; }
+
+  .gallery img { width: 100%; }
+
+  .gallery figcaption {
+    padding: 14px 18px 16px;
+    color: var(--muted);
+    font-size: 13.4px;
+    border-top: 1px solid var(--line-soft);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .gallery figcaption b { font-weight: 600; color: var(--text); }
+
+  /* ── установка ───────────────────────────────────── */
 
   .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; counter-reset: step; }
 
@@ -240,57 +502,109 @@
     position: relative;
     border: 1px solid var(--line);
     border-radius: var(--radius);
-    background: var(--bg-soft);
-    padding: 22px 22px 20px 58px;
+    background: linear-gradient(170deg, rgba(22, 32, 45, 0.75), rgba(10, 16, 23, 0.9));
+    padding: 24px 22px 22px;
   }
 
-  .step::before {
+  .step .num {
     counter-increment: step;
-    content: counter(step);
-    position: absolute;
-    left: 18px;
-    top: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent-2);
+    letter-spacing: 0.08em;
+  }
+
+  .step .num::before { content: "0" counter(step); }
+
+  .step h3 { margin: 10px 0 7px; font-size: 16px; letter-spacing: -0.01em; }
+  .step p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  .step a { color: var(--accent); text-decoration: none; border-bottom: 1px solid rgba(140, 232, 106, 0.35); }
+
+  .note {
+    margin-top: 18px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: rgba(16, 24, 35, 0.75);
+    padding: 18px 20px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .note .mark {
+    flex: none;
     width: 26px;
     height: 26px;
     border-radius: 8px;
     display: grid;
     place-items: center;
-    font-size: 13px;
+    background: rgba(53, 201, 161, 0.14);
+    border: 1px solid rgba(53, 201, 161, 0.3);
+    color: var(--accent-2);
     font-weight: 700;
-    color: var(--accent-ink);
-    background: var(--accent);
+    font-size: 13px;
   }
 
-  .step h3 { margin: 0 0 6px; font-size: 15.5px; }
-  .step p { margin: 0; color: var(--muted); font-size: 14px; }
+  .note strong { color: var(--text); font-weight: 620; }
+  .note a { color: var(--accent); }
 
-  .note {
-    margin-top: 18px;
+  code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: rgba(255, 255, 255, 0.06);
     border: 1px solid var(--line);
-    border-left: 3px solid var(--accent-2);
-    border-radius: 12px;
-    background: var(--panel);
-    padding: 16px 18px;
-    color: var(--muted);
-    font-size: 14px;
+    border-radius: 6px;
+    padding: 1px 6px;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
-  .note strong { color: var(--text); font-weight: 600; }
+  /* ── что изменилось ──────────────────────────────── */
+
+  .timeline { display: grid; gap: 14px; }
+
+  .release {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr);
+    gap: 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: linear-gradient(170deg, rgba(22, 32, 45, 0.8), rgba(10, 16, 23, 0.92));
+    padding: 24px;
+  }
+
+  .release .ver { font-family: var(--mono); font-size: 14px; color: var(--text); font-weight: 600; }
+
+  .release .date { display: block; font-family: var(--mono); font-size: 11.5px; color: var(--muted-2); margin-top: 4px; letter-spacing: 0.03em; }
+
+  .release ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14.2px; }
+  .release li { margin-bottom: 7px; }
+  .release li:last-child { margin-bottom: 0; }
+  .release li::marker { color: var(--accent-2); }
+
+  /* ── вопросы ─────────────────────────────────────── */
 
   .faq { display: grid; gap: 10px; }
 
   details {
     border: 1px solid var(--line);
-    border-radius: 14px;
-    background: var(--bg-soft);
-    padding: 0 18px;
+    border-radius: var(--radius-sm);
+    background: rgba(16, 24, 35, 0.7);
+    padding: 0 20px;
+    transition: border-color 0.2s ease, background 0.2s ease;
   }
+
+  details:hover { border-color: #2a3d50; }
+  details[open] { background: rgba(22, 32, 45, 0.8); border-color: #2b3f54; }
 
   summary {
     cursor: pointer;
-    padding: 16px 0;
-    font-weight: 600;
-    font-size: 15.2px;
+    padding: 18px 0;
+    font-weight: 610;
+    font-size: 15.3px;
     list-style: none;
     display: flex;
     align-items: center;
@@ -301,58 +615,34 @@
   summary::-webkit-details-marker { display: none; }
 
   summary::after {
-    content: "+";
-    color: var(--muted-2);
-    font-weight: 400;
-    font-size: 20px;
-    line-height: 1;
+    content: "";
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-right: 1.8px solid var(--muted-2);
+    border-bottom: 1.8px solid var(--muted-2);
+    transform: rotate(45deg);
+    transition: transform 0.2s ease;
+    margin-top: -4px;
   }
 
-  details[open] summary::after { content: "–"; }
+  details[open] summary::after { transform: rotate(-135deg); margin-top: 4px; }
 
-  details p { margin: 0 0 16px; color: var(--muted); font-size: 14.4px; }
+  details p { margin: 0 0 18px; color: var(--muted); font-size: 14.5px; }
+  details p code { white-space: normal; }
 
-  details code {
-    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-    font-size: 12.5px;
-    background: var(--panel-2);
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 1px 6px;
-  }
+  /* ── подвал ──────────────────────────────────────── */
 
-  .changelog {
-    display: grid;
-    grid-template-columns: 132px minmax(0, 1fr);
-    gap: 18px;
-    align-items: start;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    background: var(--panel);
-    padding: 22px;
-  }
+  footer { border-top: 1px solid var(--line-soft); padding: 46px 0 56px; color: var(--muted-2); font-size: 13.2px; }
 
-  .changelog .ver {
-    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-    font-size: 13px;
-    color: var(--accent-2);
-  }
+  .foot-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 32px; }
 
-  .changelog ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14.2px; }
-  .changelog li { margin-bottom: 6px; }
+  .foot-brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 620; margin-bottom: 10px; }
+  .foot-brand svg { width: 22px; height: 22px; }
 
-  footer {
-    border-top: 1px solid var(--line);
-    padding: 34px 0 44px;
-    color: var(--muted-2);
-    font-size: 13px;
-  }
-
-  .foot-grid { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
-
-  .foot-links { display: flex; gap: 16px; flex-wrap: wrap; }
-  .foot-links a { color: var(--muted); text-decoration: none; }
-  .foot-links a:hover { color: var(--text); }
+  .foot-col h4 { margin: 0 0 12px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-2); font-weight: 600; }
+  .foot-col a { display: block; color: var(--muted); text-decoration: none; padding: 4px 0; }
+  .foot-col a:hover { color: var(--text); }
 
   .menu-btn {
     display: none;
@@ -360,50 +650,58 @@
     background: none;
     border: 1px solid var(--line);
     color: var(--text);
-    border-radius: 9px;
-    padding: 7px 10px;
+    border-radius: 10px;
+    padding: 8px 12px;
     font-size: 14px;
     cursor: pointer;
   }
 
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
-  @media (max-width: 900px) {
-    .hero { padding-top: 40px; }
+  @media (max-width: 980px) {
     .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .speed { grid-template-columns: minmax(0, 1fr); }
     .steps { grid-template-columns: minmax(0, 1fr); }
     .nav { display: none; }
     .nav.open {
       display: flex;
       position: absolute;
-      top: 64px;
+      top: 70px;
       left: 0;
       right: 0;
       flex-direction: column;
-      gap: 4px;
-      padding: 12px 20px 18px;
-      background: rgba(8, 11, 16, 0.97);
+      gap: 2px;
+      padding: 12px 24px 18px;
+      background: rgba(7, 10, 15, 0.98);
       border-bottom: 1px solid var(--line);
     }
-    .nav.open a { padding: 10px 0; font-size: 15px; }
+    .nav.open a { padding: 11px 4px; font-size: 15px; }
     .menu-btn { display: inline-flex; }
+    .topbar .btn { display: none; }
   }
 
-  @media (max-width: 620px) {
-    .features, .gallery { grid-template-columns: minmax(0, 1fr); }
-    .changelog { grid-template-columns: minmax(0, 1fr); }
-    .section-head { flex-direction: column; align-items: flex-start; }
+  @media (max-width: 700px) {
+    .wrap { width: calc(100% - 36px); }
+    .hero { padding-top: 44px; }
+    .features, .gallery, .stats { grid-template-columns: minmax(0, 1fr); }
+    .gallery .wide { grid-column: auto; }
+    .release { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    .foot-grid { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+    .cta .btn { flex: 1 1 auto; }
+    section { padding: 54px 0; }
+    .speed-panel, .meter { padding: 22px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
-    .btn { transition: none; }
+    .btn, .feature, .gallery figure { transition: none; }
   }
 </style>
 </head>
 <body>
 
-<header class="topbar">
+<header class="topbar" id="topbar">
   <div class="wrap topbar-inner">
     <a class="brand" href="#top">
       <svg viewBox="0 0 32 32" aria-hidden="true">
@@ -412,91 +710,119 @@
         <path d="M16 16v13" stroke="#08120a" stroke-width="1.6" opacity=".45"/>
         <defs>
           <linearGradient id="logo" x1="0" y1="0" x2="32" y2="32">
-            <stop offset="0" stop-color="#9df07a"/><stop offset="1" stop-color="#35c9a1"/>
+            <stop offset="0" stop-color="#b6ff8f"/><stop offset="1" stop-color="#35c9a1"/>
           </linearGradient>
         </defs>
       </svg>
       Kubik Launcher
-      <small>1.1.6</small>
+      <small>1.1.7</small>
     </a>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav">Меню</button>
     <nav class="nav" id="nav" aria-label="Основная навигация">
       <a href="#features">Возможности</a>
+      <a href="#speed">Скорость</a>
       <a href="#screens">Скриншоты</a>
       <a href="#install">Установка</a>
       <a href="#faq">Вопросы</a>
       <a href="https://github.com/NAME-studio/kubik-launcher" rel="noopener">GitHub</a>
     </nav>
+    <a class="btn small primary" href="https://github.com/NAME-studio/kubik-launcher/releases/latest">Скачать</a>
   </div>
 </header>
 
 <main id="top">
 
   <section class="hero">
-    <div class="wrap hero-grid">
+    <div class="wrap">
       <div class="hero-copy">
-        <p class="eyebrow">Лаунчер Minecraft для Windows</p>
-        <h1>Сборки, моды и скины — <span>в одном месте</span></h1>
+        <p class="eyebrow"><b>1.1.7</b> Windows 10/11 · бесплатно · MIT</p>
+        <h1>Майнкрафт запускается <em>за пару секунд</em></h1>
         <p class="lead">
-          Отдельные профили для каждой сборки, установка версий Mojang, Fabric, Forge, NeoForge и Quilt,
+          Kubik Launcher проверяет файлы игры один раз, кэширует Java и больше не пересчитывает хеши
+          при каждом нажатии «Играть». Отдельные профили, Fabric, Forge, NeoForge и Quilt,
           каталог Modrinth, аккаунты Ely.by и пиксельный редактор скинов с 3D-просмотром.
         </p>
         <div class="cta">
-          <a class="btn primary" href="https://github.com/NAME-studio/kubik-launcher/releases/latest">Скачать установщик</a>
-          <a class="btn" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.1.6/KubikLauncher-1.1.6-portable.zip">Портативная версия</a>
+          <a class="btn primary" href="https://github.com/NAME-studio/kubik-launcher/releases/latest">
+            Скачать установщик
+          </a>
+          <a class="btn" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.1.7/KubikLauncher-1.1.7-portable.zip">
+            Портативная версия
+          </a>
         </div>
         <div class="meta">
-          <span>Windows 10/11 x64</span>
+          <span>Запуск ≈ 1 с</span>
           <span>Установщик 105 МБ</span>
           <span>Русский интерфейс</span>
-          <span>Бесплатно, MIT</span>
+          <span>Скины Ely.by</span>
         </div>
       </div>
 
       <figure class="shot-frame">
-        <img src="screenshots/hero.jpg" width="1920" height="900" alt="Главный экран Kubik Launcher" />
+        <img src="screenshots/hero.jpg" width="1920" height="900" alt="Главный экран Kubik Launcher: сборка, память и кнопка «Играть»" />
         <figcaption>Главная: выбранная сборка, память и быстрый запуск</figcaption>
       </figure>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="value">≈ 1 <small>с</small></div>
+          <div class="label">от нажатия «Играть» до старта процесса игры</div>
+        </div>
+        <div class="stat">
+          <div class="value">1 <small>раз</small></div>
+          <div class="label">проверка 4400+ ресурсов и 94 библиотек, дальше — мгновенно</div>
+        </div>
+        <div class="stat">
+          <div class="value">5</div>
+          <div class="label">типов сборок: Vanilla, Fabric, Quilt, Forge, NeoForge</div>
+        </div>
+        <div class="stat">
+          <div class="value">0 <small>₽</small></div>
+          <div class="label">без подписок и рекламы, исходники открыты</div>
+        </div>
+      </div>
     </div>
   </section>
 
   <section id="features">
     <div class="wrap">
       <div class="section-head">
-        <div>
-          <h2>Что внутри</h2>
-          <p>Лаунчер закрывает повседневные задачи: поставить версию, собрать моды, зайти в игру и поменять скин.</p>
-        </div>
+        <p class="kicker">Возможности</p>
+        <h2>Всё для сборок — в одном окне</h2>
+        <p>
+          Лаунчер закрывает повседневные задачи: поставить версию, собрать моды, зайти в игру
+          и поменять скин. Без лишних окон и установки сторонних утилит.
+        </p>
       </div>
 
       <div class="features">
         <article class="feature">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 7h16v12H4z"/><path d="M4 7l8-4 8 4"/></svg>
+          <div class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 7h16v12H4z"/><path d="M4 7l8-4 8 4"/></svg></div>
           <h3>Отдельные профили</h3>
           <p>У каждой сборки своя папка: моды, ресурспаки, шейдеры, миры и логи не пересекаются. Память и Java — тоже на профиль.</p>
         </article>
         <article class="feature">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>
+          <div class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg></div>
           <h3>Версии и загрузчики</h3>
           <p>Каталог Mojang с поиском и фильтрами, установка библиотек и ресурсов с проверкой SHA1. Fabric, Quilt, Forge и NeoForge.</p>
         </article>
         <article class="feature">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M9 5v14M4 12h16"/></svg>
+          <div class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M9 5v14M4 12h16"/></svg></div>
           <h3>Скины и редактор</h3>
-          <p>Пиксельный редактор 64×64 с симметрией и сеткой, каталог скинов с автоподгрузкой и 3D-просмотр с вращением.</p>
+          <p>Пиксельный редактор 64×64 с палитрой и своим HEX-цветом, каталог скинов с автоподгрузкой и 3D-модель с вращением.</p>
         </article>
         <article class="feature">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16v5H4zM4 13h10v5H4z"/></svg>
-          <h3>Modrinth</h3>
+          <div class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16v5H4zM4 13h10v5H4z"/></svg></div>
+          <h3>Modrinth и CurseForge</h3>
           <p>Поиск модов, ресурспаков, шейдеров и модпаков с фильтрами по версии игры и загрузчику, автоустановка зависимостей.</p>
         </article>
         <article class="feature">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg>
+          <div class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg></div>
           <h3>Аккаунты Ely.by</h3>
           <p>Вход с поддержкой 2FA, хранение токенов, автопродление сессии и authlib-injector — скин виден в игре и на серверах Ely.by.</p>
         </article>
         <article class="feature">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M9 12h11M9 6h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>
+          <div class="icon-tile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M9 12h11M9 6h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg></div>
           <h3>Друзья и логи</h3>
           <p>Список друзей и общие сборки, все запуски пишутся в логи, а после вылета лаунчер показывает разбор причины.</p>
         </article>
@@ -504,31 +830,97 @@
     </div>
   </section>
 
+  <section id="speed">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="kicker">Скорость</p>
+        <h2>Почему «Играть» срабатывает сразу</h2>
+        <p>
+          Раньше лаунчер при каждом запуске пересчитывал SHA1 у тысяч файлов и ходил в сеть
+          за списком Java. Теперь проверка делается один раз, а её результат запоминается.
+        </p>
+      </div>
+
+      <div class="speed">
+        <div class="speed-panel">
+          <h3>Что изменилось под капотом</h3>
+          <p>Три вещи, которые забирали почти всё время перед стартом игры.</p>
+          <div class="speed-list">
+            <div class="speed-item">
+              <span class="dot">1</span>
+              <div>
+                <strong>Метка установки версии</strong>
+                <span>После успешной установки лаунчер запоминает отпечаток ресурсов и проверяет папку за доли секунды вместо чтения 1,3 ГБ.</span>
+              </div>
+            </div>
+            <div class="speed-item">
+              <span class="dot">2</span>
+              <div>
+                <strong>Кэш найденной Java</strong>
+                <span>Путь к подходящей Java сохраняется в настройках. Поиск по диску запускается только если Java пропала.</span>
+              </div>
+            </div>
+            <div class="speed-item">
+              <span class="dot">3</span>
+              <div>
+                <strong>Локальный authlib-injector</strong>
+                <span>Готовый jar используется сразу, без запроса к GitHub при каждом запуске Ely.by-аккаунта.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="meter">
+          <p class="meter-title">ПОДГОТОВКА К ЗАПУСКУ, ЗАМЕРЫ</p>
+          <div class="bar">
+            <div class="bar-head"><span>Полная проверка файлов</span><span>2 500 мс</span></div>
+            <div class="bar-track"><i class="bar-fill" style="width: 100%"></i></div>
+          </div>
+          <div class="bar">
+            <div class="bar-head"><span>Быстрая проверка метки при запуске</span><span>30 мс</span></div>
+            <div class="bar-track"><i class="bar-fill warm" style="width: 3%"></i></div>
+          </div>
+          <div class="bar">
+            <div class="bar-head"><span>Старт процесса игры</span><span>1 050 мс</span></div>
+            <div class="bar-track"><i class="bar-fill warm" style="width: 42%"></i></div>
+          </div>
+          <p class="meter-note">
+            Замеры на сборке Fabric 1.21.10: 94 библиотеки и 4405 ресурсов. Полная проверка теперь
+            запускается только вручную — при первом запуске и по кнопке проверки файлов.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="screens">
     <div class="wrap">
       <div class="section-head">
-        <div>
-          <h2>Как это выглядит</h2>
-          <p>Тёмная и светлая тема, акцентный цвет меняется в настройках.</p>
-        </div>
+        <p class="kicker">Интерфейс</p>
+        <h2>Как это выглядит</h2>
+        <p>Тёмная и светлая тема, акцентный цвет меняется в настройках.</p>
       </div>
 
       <div class="gallery">
+        <figure class="wide">
+          <img src="screenshots/home.jpg" width="1600" height="950" alt="Главный экран лаунчера" />
+          <figcaption><span><b>Главная</b> — статус, сборка и быстрый запуск</span><span>1920 px</span></figcaption>
+        </figure>
         <figure>
           <img src="screenshots/instances.jpg" width="1600" height="950" alt="Раздел сборок с обложками" />
-          <figcaption>Сборки: обложки, версия, загрузчик и запуск</figcaption>
+          <figcaption><span><b>Сборки</b> — обложки и загрузчики</span></figcaption>
         </figure>
         <figure>
           <img src="screenshots/skins.jpg" width="1600" height="950" alt="Редактор скинов с 3D-моделью" />
-          <figcaption>Скины: 3D-модель, редактор 64×64 и каталог</figcaption>
+          <figcaption><span><b>Скины</b> — 3D-модель и редактор</span></figcaption>
         </figure>
         <figure>
           <img src="screenshots/versions.jpg" width="1600" height="950" alt="Список версий Minecraft" />
-          <figcaption>Версии: релизы, снапшоты и старые сборки</figcaption>
+          <figcaption><span><b>Версии</b> — релизы и снапшоты</span></figcaption>
         </figure>
         <figure>
-          <img src="screenshots/modpacks.jpg" width="1600" height="950" alt="Каталог модпаков Modrinth" />
-          <figcaption>Modrinth: модпаки, моды, ресурспаки и шейдеры</figcaption>
+          <img src="screenshots/modpacks.jpg" width="1600" height="950" alt="Каталог модпаков" />
+          <figcaption><span><b>Модпаки</b> — каталоги модов</span></figcaption>
         </figure>
       </div>
     </div>
@@ -537,46 +929,87 @@
   <section id="install">
     <div class="wrap">
       <div class="section-head">
-        <div>
-          <h2>Установка</h2>
-          <p>От установщика до первой игры — три шага. Портативная версия работает без установки.</p>
-        </div>
+        <p class="kicker">Установка</p>
+        <h2>От установщика до первой игры</h2>
+        <p>Три шага. Портативная версия работает без установки — распакуйте архив и запустите exe.</p>
       </div>
 
       <div class="steps">
         <article class="step">
+          <div class="num"></div>
           <h3>Скачайте установщик</h3>
           <p><a href="https://github.com/NAME-studio/kubik-launcher/releases/latest">Последний релиз</a> на GitHub. Файл — <code>KubikLauncher-Setup.exe</code>.</p>
         </article>
         <article class="step">
+          <div class="num"></div>
           <h3>Запустите и войдите</h3>
           <p>Офлайн-ник, аккаунт Ely.by или Microsoft. Для офлайн-профиля достаточно придумать имя.</p>
         </article>
         <article class="step">
+          <div class="num"></div>
           <h3>Создайте сборку</h3>
           <p>Выберите версию и загрузчик, нажмите «Играть» — лаунчер сам скачает библиотеки и ресурсы.</p>
         </article>
       </div>
 
       <div class="note">
-        <strong>Windows показывает предупреждение?</strong> Установщик пока не подписан сертификатом, поэтому SmartScreen
-        может написать «Windows защитила ваш компьютер». Нажмите «Подробнее» → «Выполнить в любом случае» или сверьте
-        контрольную сумму с <a href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.1.6/SHA256SUMS.txt">SHA256SUMS.txt</a>.
-        Проверить файл можно командой <code>certutil -hashfile KubikLauncher-Setup-1.1.3.exe SHA256</code>.
+        <span class="mark">i</span>
+        <div>
+          <strong>Windows показывает предупреждение?</strong> Установщик пока не подписан сертификатом, поэтому SmartScreen
+          может написать «Windows защитила ваш компьютер». Нажмите «Подробнее» → «Выполнить в любом случае»
+          или сверьте контрольную сумму с
+          <a href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.1.7/SHA256SUMS.txt">SHA256SUMS.txt</a>.
+          Проверить файл можно командой <code>certutil -hashfile KubikLauncher-Setup-1.1.7.exe SHA256</code>.
+        </div>
       </div>
     </div>
   </section>
 
-  <section>
+  <section id="changes">
     <div class="wrap">
-      <div class="changelog">
-        <div class="ver">1.1.6</div>
-        <ul>
-          <li>CurseForge: поиск снова работает — ключ в настройках был обрезан, восстановлен.</li>
-          <li>Редактор скинов: 2D-превью под холстом, пустого блока под ним больше нет.</li>
-          <li>Java: список кэшируется на 5 минут, настройки открываются мгновенно.</li>
-          <li>Firestore: при исчерпанной квоте лаунчер ждёт обнуления и показывает точное время.</li>
-        </ul>
+      <div class="section-head">
+        <p class="kicker">Что нового</p>
+        <h2>История версий</h2>
+      </div>
+
+      <div class="timeline">
+        <article class="release">
+          <div>
+            <div class="ver">1.1.7</div>
+            <span class="date">ноябрь 2026</span>
+          </div>
+          <ul>
+            <li>Мгновенный запуск: подготовка 30 мс вместо 26 000 мс, от «Играть» до старта процесса — около 1,1 с.</li>
+            <li>Ошибка запуска: окно с логом — скопировать, открыть и сразу перейти в папку сборки.</li>
+            <li>Запуск второй сборки: понятное предупреждение с кнопкой «Остановить и запустить».</li>
+            <li>Экспорт и импорт сборки в .zip: моды, конфиги, ресурспаки и манифест.</li>
+            <li>Автоперевод описаний модов и модпаков на русский, с кэшем.</li>
+            <li>Серверы: кнопка «Играть» запускает сборку и подключается к серверу в один клик.</li>
+            <li>Автобэкап миров перед игрой и прогресс запуска на иконке в панели задач.</li>
+          </ul>
+        </article>
+        <article class="release">
+          <div>
+            <div class="ver">1.1.6</div>
+            <span class="date">ноябрь 2026</span>
+          </div>
+          <ul>
+            <li>CurseForge: поиск снова работает — ключ в настройках был обрезан, восстановлен.</li>
+            <li>Редактор скинов: 2D-превью под холстом, пустого блока под ним больше нет.</li>
+            <li>Java: список кэшируется на 5 минут, настройки открываются мгновенно.</li>
+            <li>Firestore: при исчерпанной квоте лаунчер ждёт обнуления и показывает точное время.</li>
+          </ul>
+        </article>
+        <article class="release">
+          <div>
+            <div class="ver">1.1.5</div>
+            <span class="date">октябрь 2026</span>
+          </div>
+          <ul>
+            <li>Редактор скинов: убран пустой блок под холстом, вкладки каталога переехали в правую колонку.</li>
+            <li>Палитра: 24 цвета и поле своего HEX-цвета.</li>
+          </ul>
+        </article>
       </div>
     </div>
   </section>
@@ -584,12 +1017,15 @@
   <section id="faq">
     <div class="wrap">
       <div class="section-head">
-        <div>
-          <h2>Вопросы</h2>
-        </div>
+        <p class="kicker">Вопросы</p>
+        <h2>Коротко о главном</h2>
       </div>
 
       <div class="faq">
+        <details>
+          <summary>Почему игра запускается так быстро?</summary>
+          <p>Лаунчер не пересчитывает SHA1 у всех файлов при каждом запуске. После первой установки он запоминает отпечаток версии и ресурсов, а путь к подходящей Java и authlib-injector сохраняет в настройках. Полную проверку можно запустить вручную — кнопкой проверки файлов.</p>
+        </details>
         <details>
           <summary>Нужна ли Java?</summary>
           <p>Не обязательно. Лаунчер находит установленные Java 8/17/21/23 и при необходимости скачивает подходящую JRE от Adoptium в свою папку.</p>
@@ -604,7 +1040,7 @@
         </details>
         <details>
           <summary>Как обновляется лаунчер?</summary>
-          <p>Кнопкой проверки обновлений в настройках: лаунчер скачает новую версию с GitHub Releases и установит её сам.</p>
+          <p>Кнопкой проверки обновлений в настройках: лаунчер скачает новую версию с GitHub Releases и установит её сам. При запуске он тоже предлагает обновиться, если вышла новая версия.</p>
         </details>
         <details>
           <summary>Это официальный лаунчер Minecraft?</summary>
@@ -623,13 +1059,33 @@
 <footer>
   <div class="wrap foot-grid">
     <div>
-      Kubik Launcher · MIT · Не связан с Mojang Studios и Microsoft.<br />
+      <div class="foot-brand">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 3 28 9.5v13L16 29 4 22.5v-13L16 3Z" fill="url(#logo2)"/>
+          <defs>
+            <linearGradient id="logo2" x1="0" y1="0" x2="32" y2="32">
+              <stop offset="0" stop-color="#b6ff8f"/><stop offset="1" stop-color="#35c9a1"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        Kubik Launcher
+      </div>
+      Бесплатный лаунчер для Windows. MIT.<br />
+      Не связан с Mojang Studios и Microsoft.<br />
       Minecraft — торговая марка Mojang Studios.
     </div>
-    <div class="foot-links">
+    <div class="foot-col">
+      <h4>Продукт</h4>
+      <a href="#features">Возможности</a>
+      <a href="#speed">Скорость запуска</a>
+      <a href="#install">Установка</a>
+      <a href="#changes">История версий</a>
+    </div>
+    <div class="foot-col">
+      <h4>Ссылки</h4>
       <a href="https://github.com/NAME-studio/kubik-launcher">Исходники</a>
       <a href="https://github.com/NAME-studio/kubik-launcher/releases">Релизы</a>
-      <a href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.1.6/SHA256SUMS.txt">Контрольные суммы</a>
+      <a href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.1.7/SHA256SUMS.txt">Контрольные суммы</a>
       <a href="#top">Наверх</a>
     </div>
   </div>
@@ -639,6 +1095,15 @@
   (function () {
     var button = document.querySelector('.menu-btn');
     var nav = document.getElementById('nav');
+    var topbar = document.getElementById('topbar');
+
+    var onScroll = function () {
+      if (!topbar) return;
+      topbar.classList.toggle('scrolled', window.scrollY > 8);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
     if (!button || !nav) return;
     button.addEventListener('click', function () {
       var open = nav.classList.toggle('open');

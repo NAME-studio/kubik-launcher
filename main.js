@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, BrowserWindow, ipcMain, shell, dialog, Menu, Tray } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Menu, Tray, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -28,6 +28,7 @@ const launcher = require('./src/main/launch');
 const ely = require('./src/main/ely');
 const microsoft = require('./src/main/microsoft');
 const modrinth = require('./src/main/modrinth');
+const translate = require('./src/main/translate');
 const javaManager = require('./src/main/java');
 const gameOptions = require('./src/main/options');
 const crash = require('./src/main/crash');
@@ -174,9 +175,24 @@ function wrap(handler) {
       const data = await handler(...args);
       return { ok: true, data };
     } catch (error) {
-      return { ok: false, error: error && error.message ? error.message : String(error) };
+      return {
+        ok: false,
+        error: error && error.message ? error.message : String(error),
+        logFile: (error && error.logFile) || null,
+        code: (error && error.code) || null,
+        meta: (error && error.meta) || null,
+      };
     }
   };
+}
+
+function setTaskbarProgress(value) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    mainWindow.setProgressBar(value);
+  } catch {
+    /* окно могло закрыться */
+  }
 }
 
 function progressFor(instanceId, channel = 'install:progress') {
@@ -185,6 +201,10 @@ function progressFor(instanceId, channel = 'install:progress') {
     const now = Date.now();
     if (now - lastEmit < 100 && payload.percent !== 100) return;
     lastEmit = now;
+    const percent = Number(payload.percent);
+    if (Number.isFinite(percent)) {
+      setTaskbarProgress(percent >= 100 ? -1 : Math.max(0, Math.min(1, percent / 100)));
+    }
     emit(channel, { instanceId, ...payload });
   };
 }
@@ -431,6 +451,13 @@ function registerIpc() {
   );
   ipcMain.handle('app:open-path', wrap(({ target }) => shell.openPath(target)));
   ipcMain.handle(
+    'app:copy-text',
+    wrap(({ text }) => {
+      clipboard.writeText(String(text || ''));
+      return true;
+    }),
+  );
+  ipcMain.handle(
     'app:pick-folder',
     wrap(async ({ title }) => {
       const result = await dialog.showOpenDialog(mainWindow, {
@@ -532,6 +559,35 @@ function registerIpc() {
   ipcMain.handle('instances:options-get', wrap(({ id }) => gameOptions.read(id)));
   ipcMain.handle('instances:options-save', wrap(({ id, patch }) => gameOptions.write(id, patch)));
   ipcMain.handle('instances:open-folder', wrap(({ id }) => shell.openPath(paths.instanceDir(id))));
+  ipcMain.handle(
+    'instances:export',
+    wrap(async ({ id, withSaves }) => {
+      const instance = instances.readInstance(id);
+      if (!instance) throw new Error('Сборка не найдена');
+      const safeName = String(instance.name).replace(/[\\/:*?"<>|]/g, '-').trim().slice(0, 40) || 'sborka';
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Экспорт сборки',
+        defaultPath: path.join(app.getPath('downloads'), `${safeName}.zip`),
+        filters: [{ name: 'Архив сборки', extensions: ['zip'] }],
+      });
+      if (result.canceled || !result.filePath) return null;
+      return instances.exportInstance(id, result.filePath, { withSaves: Boolean(withSaves) });
+    }),
+  );
+  ipcMain.handle(
+    'instances:import',
+    wrap(async () => {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Импорт сборки',
+        filters: [{ name: 'Архив сборки', extensions: ['zip'] }],
+        properties: ['openFile'],
+      });
+      if (result.canceled || !result.filePaths.length) return null;
+      const instance = instances.importInstance(result.filePaths[0]);
+      emit('instances:changed', {});
+      return instance;
+    }),
+  );
 
   ipcMain.handle(
     'game:prepare-all',
@@ -560,38 +616,68 @@ function registerIpc() {
       const instance = instances.readInstance(instanceId);
       if (!instance) throw new Error('Сборка не найдена');
       const progress = progressFor(instanceId);
-      const versionId = await instances.ensureProfile(instance, progress);
+      const versionId = await instances.ensureProfile(instance, progress, { verify: true });
       return { versionId };
     }),
   );
 
   ipcMain.handle(
     'game:launch',
-    wrap(async ({ instanceId }) => {
+    wrap(async ({ instanceId, server }) => {
       const instance = instances.readInstance(instanceId);
       if (!instance) throw new Error('Сборка не найдена');
+      const extraGameArgs = [];
+      if (server) {
+        const raw = String(server).trim();
+        const [host, port] = raw.split(':');
+        if (host) {
+          extraGameArgs.push('--server', host, '--port', String(port || 25565));
+        }
+      }
+      const activeIds = [...launcher.running.keys()].filter((id) => id !== instanceId);
+      if (activeIds.length) {
+        const active = instances.readInstance(activeIds[0]);
+        const activeName = active ? active.name : activeIds[0];
+        const busy = new Error(`Уже запущена сборка «${activeName}». Закройте её, чтобы играть в другую.`);
+        busy.code = 'another-running';
+        busy.meta = { instanceId: activeIds[0], instanceName: activeName };
+        throw busy;
+      }
       let account = store.currentAccount();
       if (!account) throw new Error('Сначала выберите аккаунт — офлайн, Ely.by или Microsoft');
+      const authStart = Date.now();
       if (account.type === 'ely') {
-        const valid = await ely.validate(account.accessToken);
+        const valid = await ely.validateCached(account);
         if (!valid) account = await ely.refresh(account);
       } else if (account.type === 'microsoft') {
         account = await microsoft.refresh(account);
       }
+      console.log('[timing] launch:auth', Date.now() - authStart);
       const settings = store.getSettings();
       emit('launch:state', { instanceId, state: 'preparing' });
-      const result = await launcher.launch(instance, account, {
-        onProgress: progressFor(instanceId),
-        onLog: (text, stream) => emit('launch:log', { instanceId, text, stream }),
-        onStarted: ({ pid, logFile }) => {
-          emit('launch:state', { instanceId, state: 'running', pid, logFile });
-          rpc.update({ state: 'game', instanceName: instance.name, startedAt: Date.now() });
-        },
-        onExit: ({ code, signal, logFile }) => {
-          emit('launch:state', { instanceId, state: 'exited', code, signal, logFile });
-          rpc.update({ state: 'launcher' });
-        },
-      });
+      setTaskbarProgress(2);
+      let result;
+      try {
+        result = await launcher.launch(instance, account, {
+          extraGameArgs,
+          onProgress: progressFor(instanceId),
+          onLog: (text, stream) => emit('launch:log', { instanceId, text, stream }),
+          onStarted: ({ pid, logFile }) => {
+            console.log('[timing] launch:spawn', Date.now() - authStart);
+            setTaskbarProgress(-1);
+            emit('launch:state', { instanceId, state: 'running', pid, logFile });
+            rpc.update({ state: 'game', instanceName: instance.name, startedAt: Date.now() });
+          },
+          onExit: ({ code, signal, logFile }) => {
+            setTaskbarProgress(-1);
+            emit('launch:state', { instanceId, state: 'exited', code, signal, logFile });
+            rpc.update({ state: 'launcher' });
+          },
+        });
+      } catch (error) {
+        setTaskbarProgress(-1);
+        throw error;
+      }
       if (settings.closeOnLaunch) {
         emit('launch:state', { instanceId, state: 'launcher-hidden' });
         if (mainWindow) mainWindow.hide();
@@ -602,10 +688,30 @@ function registerIpc() {
     }),
   );
   ipcMain.handle('game:stop', wrap(({ instanceId }) => launcher.stop(instanceId)));
+  ipcMain.handle(
+    'game:stop-all',
+    wrap(() => {
+      const ids = [...launcher.running.keys()];
+      for (const id of ids) launcher.stop(id);
+      return { stopped: ids };
+    }),
+  );
   ipcMain.handle('game:running', wrap(({ instanceId }) => launcher.isRunning(instanceId)));
   ipcMain.handle(
     'game:diagnose',
     wrap(({ logFile, extra }) => crash.diagnose(logFile, extra)),
+  );
+  ipcMain.handle(
+    'game:copy-log',
+    wrap(({ logFile }) => {
+      const target = path.resolve(String(logFile || ''));
+      const logsDir = path.resolve(paths.logs());
+      if (!target.startsWith(logsDir)) throw new Error('Файл лога вне папки логов');
+      if (!fs.existsSync(target)) throw new Error('Файл лога не найден');
+      const text = fs.readFileSync(target, 'utf8');
+      clipboard.writeText(text.slice(-120000));
+      return { chars: Math.min(text.length, 120000) };
+    }),
   );
 
   ipcMain.handle('instances:delete-many', wrap(({ ids }) => instances.deleteInstances(ids, true)));
@@ -698,6 +804,10 @@ function registerIpc() {
     }),
   );
   ipcMain.handle('content:project', wrap(({ id }) => modrinth.getProject(id)));
+  ipcMain.handle(
+    'content:translate',
+    wrap(({ text, from, to }) => translate.translate(text, { from, to: to || 'ru' })),
+  );
   ipcMain.handle('content:versions', wrap(({ id, gameVersion, loader }) => modrinth.getVersions(id, { gameVersion, loader })));
   ipcMain.handle('content:installed', wrap(({ instanceId }) => modrinth.installed(instanceId)));
   ipcMain.handle(
@@ -760,6 +870,16 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
     else showWindow();
   });
+
+  setTimeout(() => {
+    const settings = store.getSettings();
+    const instance = instances.listInstances().find((item) => item.id === settings.lastInstance);
+    if (!instance) return;
+    const account = store.currentAccount();
+    if (!account) return;
+    if (account.type === 'ely') ely.validateCached(account).catch(() => {});
+    launcher.warm(instance, account).catch(() => {});
+  }, 2500);
 });
 
 app.on('before-quit', () => {

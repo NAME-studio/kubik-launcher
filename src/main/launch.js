@@ -16,6 +16,9 @@ const LAUNCHER_VERSION = '1.0.0';
 
 const running = new Map();
 
+const STARTED_RE = /(Setting user:|Backend library:|LWJGL Version|Using LWJGL|OpenAL initialized|Reloading ResourceManager|Narrator library)/i;
+const EARLY_WINDOW_MS = 900;
+
 function substitute(input, values) {
   if (typeof input !== 'string') return input;
   return input.replace(/\$\{([^}]+)\}/g, (match, key) => {
@@ -110,12 +113,12 @@ async function prepare(instance, account, onProgress = () => {}) {
   const profileVersion = await instances.ensureProfile(instance, onProgress);
   const version = await mojang.resolveVersion(profileVersion);
   const javaMajor = (version.javaVersion && version.javaVersion.majorVersion) || 8;
-  const javaInfo = await java.ensureJava(javaMajor, onProgress);
+  const javaInfo = await java.ensureJava(javaMajor, onProgress, instance.javaPath);
   return { version, javaInfo, javaMajor, profileVersion };
 }
 
 async function buildCommand(instance, account, profileVersion, javaInfo, settings, options = {}) {
-  const version = await mojang.resolveVersion(profileVersion);
+  const version = options.version || (await mojang.resolveVersion(profileVersion));
   const features = {
     is_demo_user: false,
     has_custom_resolution: Boolean(instance.resolution && instance.resolution.custom),
@@ -181,6 +184,10 @@ async function buildCommand(instance, account, profileVersion, javaInfo, setting
   const userGame = String(instance.gameArgs || settings.gameArgs || '').trim();
   if (userGame) gameArgs.push(...userGame.split(/\s+/).filter(Boolean));
 
+  if (Array.isArray(options.extraGameArgs) && options.extraGameArgs.length) {
+    gameArgs.push(...options.extraGameArgs.map((arg) => String(arg)));
+  }
+
   if (!gameArgs.includes('--versionType') && version.arguments && version.arguments.game) {
     gameArgs.push('--versionType', version.type || 'release');
   }
@@ -211,11 +218,43 @@ async function launch(instance, account, handlers = {}) {
   const onLog = handlers.onLog || (() => {});
   const onExit = handlers.onExit || (() => {});
 
-  const settings = store.getSettings();
-  const { javaInfo, profileVersion } = await prepare(instance, account, onProgress);
-  const command = await buildCommand(instance, account, profileVersion, javaInfo, settings);
-
   const logFile = logFileFor(instance.id);
+  const fail = (message) => {
+    const error = new Error(message);
+    error.logFile = logFile;
+    return error;
+  };
+  const logLine = (text, stream = 'out') => {
+    try {
+      fs.appendFileSync(logFile, `[${new Date().toLocaleTimeString('ru-RU')}] ${stream === 'err' ? 'ERR ' : ''}${stripAnsi(text)}\n`);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const settings = store.getSettings();
+  let prepared;
+  try {
+    prepared = await prepare(instance, account, onProgress);
+  } catch (error) {
+    logLine(`Подготовка не удалась: ${error.message}`, 'err');
+    error.logFile = logFile;
+    throw error;
+  }
+  const { javaInfo, profileVersion, version } = prepared;
+
+  let command;
+  try {
+    command = await buildCommand(instance, account, profileVersion, javaInfo, settings, {
+      version,
+      extraGameArgs: handlers.extraGameArgs,
+    });
+  } catch (error) {
+    logLine(`Не удалось собрать команду запуска: ${error.message}`, 'err');
+    error.logFile = logFile;
+    throw error;
+  }
+
   const writeLog = (text, stream = 'out') => {
     const clean = stripAnsi(text);
     try {
@@ -251,6 +290,7 @@ async function launch(instance, account, handlers = {}) {
       });
     } catch (error) {
       writeLog(`Не удалось запустить игру: ${error.message}\n`, 'err');
+      error.logFile = logFile;
       throw error;
     }
 
@@ -262,13 +302,19 @@ async function launch(instance, account, handlers = {}) {
 
     const early = await new Promise((resolve) => {
       let settled = false;
-      const done = (value) => {
+      const timer = setTimeout(() => done({ exited: false }), EARLY_WINDOW_MS);
+      function done(value) {
         if (settled) return;
         settled = true;
+        clearTimeout(timer);
         resolve(value);
+      }
+      const watch = () => {
+        if (STARTED_RE.test(outputTail)) done({ exited: false });
       };
+      child.stdout.on('data', watch);
+      child.stderr.on('data', watch);
       child.once('exit', (code, signal) => done({ exited: true, code, signal }));
-      setTimeout(() => done({ exited: false }), 6000);
     });
 
     if (!early.exited) break;
@@ -286,7 +332,7 @@ async function launch(instance, account, handlers = {}) {
     }
 
     if (/UnsupportedClassVersionError|class file version/i.test(outputTail)) {
-      throw new Error(
+      throw fail(
         `Игре нужна более новая Java (установлена ${javaInfo.major || '?'}). Выберите другую Java в настройках.`,
       );
     }
@@ -298,15 +344,18 @@ async function launch(instance, account, handlers = {}) {
       .slice(-3)
       .join(' ')
       .slice(0, 320);
-    throw new Error(`Игра не запустилась (код ${early.code}). ${reason || 'Смотрите лог запуска.'}`);
+    throw fail(`Игра не запустилась (код ${early.code}). ${reason || 'Смотрите лог запуска.'}`);
   }
 
   if (!child || child.exitCode !== null) {
-    throw new Error('Не удалось подобрать параметры Java для запуска. Смотрите лог.');
+    throw fail('Не удалось подобрать параметры Java для запуска. Смотрите лог.');
   }
 
   running.set(instance.id, child);
   handlers.onStarted && handlers.onStarted({ pid: child.pid, logFile });
+  setTimeout(() => {
+    backupWorlds(instance.id).catch(() => {});
+  }, 2500);
 
   child.on('exit', (code, signal) => {
     running.delete(instance.id);
@@ -342,4 +391,65 @@ function isRunning(instanceId) {
   return running.has(instanceId);
 }
 
-module.exports = { launch, stop, isRunning, prepare, buildCommand, running };
+const BACKUP_KEEP = 3;
+const BACKUP_EVERY_MS = 30 * 60 * 1000;
+
+async function backupWorlds(instanceId) {
+  const gameDir = paths.instanceGameDir(instanceId);
+  const saves = path.join(gameDir, 'saves');
+  if (!exists(saves)) return null;
+  let worlds = [];
+  try {
+    worlds = fs.readdirSync(saves, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+  } catch {
+    return null;
+  }
+  if (!worlds.length) return null;
+
+  const backups = path.join(gameDir, 'backups');
+  ensureDir(backups);
+  let existing = [];
+  try {
+    existing = fs.readdirSync(backups).filter((name) => /^\d+$/.test(name)).sort();
+  } catch {
+    existing = [];
+  }
+  if (existing.length) {
+    const last = Number(existing[existing.length - 1]);
+    if (Number.isFinite(last) && Date.now() - last < BACKUP_EVERY_MS) return null;
+  }
+
+  const target = path.join(backups, String(Date.now()));
+  ensureDir(target);
+  for (const world of worlds) {
+    try {
+      await fs.promises.cp(path.join(saves, world.name), path.join(target, world.name), { recursive: true });
+    } catch {
+      /* пропускаем мир */
+    }
+  }
+
+  try {
+    const list = fs.readdirSync(backups).filter((name) => /^\d+$/.test(name)).sort();
+    for (const name of list.slice(0, Math.max(0, list.length - BACKUP_KEEP))) {
+      await fs.promises.rm(path.join(backups, name), { recursive: true, force: true }).catch(() => {});
+    }
+  } catch {
+    /* ignore */
+  }
+  return target;
+}
+
+async function warm(instance, account) {
+  if (!instance) return false;
+  try {
+    const settings = store.getSettings();
+    const { javaInfo, profileVersion, version } = await prepare(instance, account);
+    await buildCommand(instance, account, profileVersion, javaInfo, settings, { version });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+module.exports = { launch, stop, isRunning, prepare, buildCommand, warm, backupWorlds, running };

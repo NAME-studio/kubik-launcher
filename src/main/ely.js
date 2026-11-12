@@ -85,6 +85,7 @@ async function refresh(account) {
       accessToken: data.accessToken,
       username: profile.name || account.username,
       uuid: profile.id ? uuidDashed(profile.id) : account.uuid,
+      tokenCheckedAt: Date.now(),
     };
     store.saveAccount(updated);
     return updated;
@@ -105,6 +106,21 @@ async function validate(accessToken) {
   } catch {
     return false;
   }
+}
+
+const validateCache = new Map();
+const TOKEN_CHECK_TTL = 6 * 60 * 60 * 1000;
+
+async function validateCached(account) {
+  const token = account && account.accessToken;
+  if (!token) return false;
+  if (account.tokenCheckedAt && Date.now() - account.tokenCheckedAt < TOKEN_CHECK_TTL) return true;
+  const hit = validateCache.get(token);
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.ok;
+  const ok = await validate(token);
+  validateCache.set(token, { ok, at: Date.now() });
+  if (ok && account.id) store.saveAccount({ id: account.id, tokenCheckedAt: Date.now() });
+  return ok;
 }
 
 function parseTextures(profile) {
@@ -243,10 +259,49 @@ function setLocalSkin(account, dataUrl, model) {
   return { dataUrl: `data:image/png;base64,${buffer.toString('base64')}`, model: updated.skinModel };
 }
 
+function findLocalInjector() {
+  const base = paths.authlib();
+  if (!exists(base)) return null;
+  let best = null;
+  let entries = [];
+  try {
+    entries = fs.readdirSync(base, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const dir = path.join(base, entry.name);
+    let files = [];
+    try {
+      files = fs.readdirSync(dir);
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      if (!/^authlib-injector.*\.jar$/i.test(file)) continue;
+      const full = path.join(dir, file);
+      try {
+        const stat = fs.statSync(full);
+        if (stat.size < 200 * 1024) continue;
+        if (!best || stat.mtimeMs > best.mtime) best = { path: full, mtime: stat.mtimeMs };
+      } catch {
+        /* пропускаем */
+      }
+    }
+  }
+  return best ? best.path : null;
+}
+
 async function ensureAuthlibInjector() {
   if (injectorCache && exists(injectorCache)) return injectorCache;
+  const local = findLocalInjector();
+  if (local) {
+    injectorCache = local;
+    return local;
+  }
   try {
-    const latest = await net.fetchJson(AUTH_INJECTOR_LATEST, { timeout: 20000 });
+    const latest = await net.fetchJson(AUTH_INJECTOR_LATEST, { timeout: 8000 });
     const dir = ensureDir(path.join(paths.authlib(), latest.version));
     const dest = path.join(dir, `authlib-injector-${latest.version}.jar`);
     const expectedSha256 = latest.checksums && latest.checksums.sha256;
@@ -297,6 +352,7 @@ module.exports = {
   authenticate,
   refresh,
   validate,
+  validateCached,
   skinProfile,
   downloadSkinTexture,
   skinDataUrl,

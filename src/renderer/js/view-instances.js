@@ -489,7 +489,23 @@ window.Views.instances = (() => {
       body,
       actions: [
         {
+          label: 'Экспорт',
+          onClick: async () => {
+            try {
+              const result = await UI.req(window.api.instances.exportPack(instance.id, false));
+              if (result) {
+                const mb = Math.round((result.bytes / 1048576) * 10) / 10;
+                UI.toast(`Сборка сохранена в .zip: ${mb} МБ, файлов ${result.files}`, 'success', 7000);
+              }
+            } catch (error) {
+              UI.toast(error.message, 'error', 9000);
+            }
+            return false;
+          },
+        },
+        {
           label: 'Удалить',
+
           kind: 'danger',
           icon: 'trash',
           onClick: async () => {
@@ -688,6 +704,24 @@ window.Views.instances = (() => {
         }
         actions.append(bar);
       }
+
+      const importButton = UI.el('button', {
+        class: 'btn sm ghost',
+        onclick: async () => {
+          try {
+            const created = await UI.req(window.api.instances.importPack());
+            if (!created) return;
+            await App.reloadInstances();
+            App.refresh();
+            UI.toast(`Сборка «${created.name}» импортирована`, 'success', 7000);
+          } catch (error) {
+            UI.toast(error.message, 'error', 9000);
+          }
+        },
+      }, 'Импорт .zip');
+      const existingBar = actions.firstElementChild;
+      if (existingBar) existingBar.append(importButton);
+      else actions.append(UI.el('div', { class: 'row', style: { gap: '8px' } }, importButton));
 
       if (selecting) {
         container.append(UI.el('div', { class: 'page-notice' }, UI.icon('info'),

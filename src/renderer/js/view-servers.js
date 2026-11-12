@@ -88,6 +88,27 @@ window.Views.servers = (() => {
     );
   }
 
+  async function joinServer(server) {
+    const list = App.state.instances || [];
+    if (!list.length) {
+      UI.toast('Сначала создайте сборку — сервер запустится внутри неё', 'info', 6000);
+      return;
+    }
+    const settings = App.state.settings || {};
+    const preferred = list.find((item) => item.id === settings.lastInstance) || list[0];
+    try {
+      UI.toast(`Запускаю «${preferred.name}» и подключаюсь к ${server.address}`, 'info', 6000);
+      const result = await UI.req(window.api.game.launch(preferred.id, server.address));
+      App.state.running[preferred.id] = true;
+      App.state.logFiles = App.state.logFiles || {};
+      App.state.logFiles[preferred.id] = result.logFile;
+      App.refresh();
+    } catch (error) {
+      if (App.showLaunchError) App.showLaunchError(preferred, error);
+      else UI.toast(error.message, 'error', 9000);
+    }
+  }
+
   function serverCard(server, hostList) {
     const status = state.status[server.address];
     const online = status && status.online;
@@ -115,6 +136,14 @@ window.Views.servers = (() => {
         meta,
         status && status.motd ? UI.el('div', { class: 'tiny', style: { marginTop: '4px', color: 'var(--muted)' }, text: status.motd }) : null,
       ),
+      UI.el('button', {
+        class: 'btn sm primary',
+        title: 'Запустить игру и подключиться',
+        onclick: (event) => {
+          event.stopPropagation();
+          joinServer(server);
+        },
+      }, UI.icon('play'), 'Играть'),
       UI.el('button', {
         class: 'btn sm ghost icon-only',
         title: 'Поделиться с другом',

@@ -124,7 +124,11 @@
     const result = await promise;
     if (!result || result.ok !== true) {
       const message = result && result.error ? result.error : 'Неизвестная ошибка';
-      throw new Error(message);
+      const error = new Error(message);
+      if (result && result.logFile) error.logFile = result.logFile;
+      if (result && result.code) error.code = result.code;
+      if (result && result.meta) error.meta = result.meta;
+      throw error;
     }
     return result.data;
   };

@@ -8,6 +8,8 @@ const store = require('./store');
 const mojang = require('./mojang');
 const java = require('./java');
 const net = require('./net');
+const zip = require('./zip');
+const zipwrite = require('./zipwrite');
 const { ensureDir, exists, slugify, randomId, unlinkQuiet, isDir } = require('./util');
 
 const FABRIC_META = 'https://meta.fabricmc.net/v2';
@@ -354,7 +356,7 @@ async function installFabricLike(instance, onProgress) {
   return id;
 }
 
-async function ensureProfile(instance, onProgress = () => {}) {
+async function ensureProfile(instance, onProgress = () => {}, options = {}) {
   const type = instance.loader.type || 'vanilla';
   let profileVersion = instance.mcVersion;
 
@@ -367,6 +369,7 @@ async function ensureProfile(instance, onProgress = () => {}) {
   await mojang.installVersion(profileVersion, {
     onProgress,
     gameDir: paths.instanceGameDir(instance.id),
+    verify: Boolean(options.verify),
   });
   if (!instance.loader.profileId && profileVersion !== instance.mcVersion) {
     instance.loader.profileId = profileVersion;
@@ -379,7 +382,13 @@ function instanceSize(id) {
   let total = 0;
   const walk = (dir) => {
     if (!exists(dir)) return;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
       else {
@@ -395,6 +404,99 @@ function instanceSize(id) {
   return total;
 }
 
+const PACK_FORMAT = 1;
+
+function exportInstance(id, destPath, options = {}) {
+  const instance = readInstance(id);
+  if (!instance) throw new Error('Сборка не найдена');
+  const dir = paths.instanceGameDir(id);
+  const skip = ['logs', 'crash-reports', 'screenshots', 'natives'];
+  if (!options.withSaves) skip.push('saves');
+
+  const files = zipwrite.collectFiles(dir, { skip });
+  const entries = [];
+  for (const file of files) {
+    if (file.name === 'instance.json') continue;
+    if (file.name.startsWith('.')) continue;
+    entries.push({ name: file.name, path: file.path });
+  }
+
+  const manifest = {
+    format: PACK_FORMAT,
+    app: 'KubikLauncher',
+    createdAt: new Date().toISOString(),
+    name: instance.name,
+    mcVersion: instance.mcVersion,
+    loader: instance.loader,
+    memoryMB: instance.memoryMB,
+    cover: instance.cover,
+    jvmArgs: instance.jvmArgs || '',
+    files: entries.length,
+  };
+  entries.unshift({
+    name: '.kubik-pack.json',
+    data: Buffer.from(JSON.stringify(manifest, null, 2), 'utf8'),
+    compress: true,
+  });
+
+  const result = zipwrite.create(destPath, entries);
+  return { path: destPath, files: entries.length, bytes: result.bytes, withSaves: Boolean(options.withSaves) };
+}
+
+function importInstance(zipPath) {
+  const temp = path.join(paths.cache(), `import-${Date.now().toString(36)}`);
+  ensureDir(temp);
+  try {
+    zip.extract(zipPath, temp);
+    let manifest = null;
+    try {
+      manifest = JSON.parse(fs.readFileSync(path.join(temp, '.kubik-pack.json'), 'utf8'));
+    } catch {
+      manifest = null;
+    }
+    const rawName = String((manifest && manifest.name) || path.basename(zipPath, path.extname(zipPath)) || 'Сборка');
+    const instance = createInstance({
+      name: `${rawName.slice(0, 40)} (импорт)`,
+      mcVersion: (manifest && manifest.mcVersion) || '1.21.1',
+      loader: (manifest && manifest.loader) || { type: 'vanilla', version: null },
+      memoryMB: (manifest && manifest.memoryMB) || undefined,
+      cover: (manifest && manifest.cover) || undefined,
+    });
+    const target = paths.instanceGameDir(instance.id);
+    const copyInto = (from, to) => {
+      let entries = [];
+      try {
+        entries = fs.readdirSync(from, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        if (entry.name === '.kubik-pack.json' || entry.name === 'instance.json') continue;
+        const source = path.join(from, entry.name);
+        const dest = path.join(to, entry.name);
+        try {
+          if (entry.isDirectory()) {
+            ensureDir(dest);
+            copyInto(source, dest);
+          } else {
+            fs.copyFileSync(source, dest);
+          }
+        } catch {
+          /* пропускаем нечитаемое */
+        }
+      }
+    };
+    copyInto(temp, target);
+    if (manifest && manifest.jvmArgs) {
+      instance.jvmArgs = String(manifest.jvmArgs).slice(0, 500);
+      writeInstance(instance);
+    }
+    return instance;
+  } finally {
+    unlinkQuiet(temp);
+  }
+}
+
 module.exports = {
   COVERS,
   listInstances,
@@ -408,5 +510,7 @@ module.exports = {
   loaderVersions,
   ensureGameDirs,
   instanceSize,
+  exportInstance,
+  importInstance,
   writeInstance,
 };

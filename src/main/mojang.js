@@ -11,6 +11,7 @@ const {
   exists,
   sizeOf,
   sha1File,
+  sha1Buffer,
   isAllowed,
   parseMaven,
   mavenPath,
@@ -25,6 +26,7 @@ const LIBRARY_BASE = 'https://libraries.minecraft.net';
 
 let manifestCache = null;
 let manifestTime = 0;
+const versionCache = new Map();
 
 async function getManifest(force = false) {
   if (manifestCache && !force && Date.now() - manifestTime < 10 * 60 * 1000) return manifestCache;
@@ -75,6 +77,16 @@ function readLocalVersionJson(id) {
 }
 
 async function resolveVersion(id) {
+  const cacheKey = path.join(paths.versions(), id, `${id}.json`);
+  let stamp = 0;
+  try {
+    stamp = fs.statSync(cacheKey).mtimeMs;
+  } catch {
+    stamp = 0;
+  }
+  const cached = versionCache.get(id);
+  if (cached && cached.stamp === stamp) return cached.version;
+
   const chain = [];
   let current = await getVersionJson(id);
   chain.push(current);
@@ -138,6 +150,7 @@ async function resolveVersion(id) {
   }
   merged.clientJarVersion = clientJarVersion;
   merged.chain = chain.map((v) => v.id);
+  versionCache.set(id, { stamp, version: merged });
   return merged;
 }
 
@@ -189,6 +202,87 @@ function extractNatives(archivePath, targetDir, extractRules) {
   zip.extract(archivePath, targetDir, { filter: (name) => !isExcluded(name) });
 }
 
+function markerPath(versionId) {
+  return path.join(paths.versions(), versionId, '.kubik-install.json');
+}
+
+function assetsSignature() {
+  const base = paths.assetsObjects();
+  if (!exists(base)) return 'none';
+  let buckets = [];
+  try {
+    buckets = fs.readdirSync(base, { withFileTypes: true });
+  } catch {
+    return 'none';
+  }
+  const parts = [];
+  for (const bucket of buckets) {
+    if (!bucket.isDirectory()) continue;
+    try {
+      const stat = fs.statSync(path.join(base, bucket.name));
+      parts.push(`${bucket.name}:${Math.round(stat.mtimeMs)}`);
+    } catch {
+      /* пропускаем */
+    }
+  }
+  parts.sort();
+  return `${parts.length}|${sha1Buffer(Buffer.from(parts.join(';'), 'utf8'))}`;
+}
+
+function readMarker(versionId) {
+  try {
+    return JSON.parse(fs.readFileSync(markerPath(versionId), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function writeMarker(versionId, data) {
+  try {
+    ensureDir(path.dirname(markerPath(versionId)));
+    fs.writeFileSync(markerPath(versionId), JSON.stringify({ ...data, at: Date.now() }), 'utf8');
+  } catch {
+    /* маркер не критичен */
+  }
+}
+
+function nativesPresent(versionId) {
+  const dir = path.join(paths.versions(), versionId, 'natives');
+  try {
+    return fs.readdirSync(dir).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function quickInstallState(version) {
+  const marker = readMarker(version.id);
+  if (!marker) return { ok: false, reason: 'нет метки установки' };
+  const indexId = version.assetIndex ? version.assetIndex.id : null;
+  if ((marker.assetIndexId || null) !== indexId) return { ok: false, reason: 'сменился индекс ресурсов' };
+  if (version.clientJarVersion) {
+    const jar = path.join(paths.versions(), version.clientJarVersion, `${version.clientJarVersion}.jar`);
+    if (!exists(jar) || sizeOf(jar) <= 0) return { ok: false, reason: 'нет client.jar' };
+  }
+  const needsNatives = (version.libraries || []).some((lib) => {
+    const classifier = nativeClassifier(lib);
+    return Boolean(classifier) || Boolean(lib.natives);
+  });
+  if (needsNatives && !nativesPresent(version.id)) return { ok: false, reason: 'нет нативных библиотек' };
+  if (version.logging && version.logging.client && version.logging.client.file) {
+    const logFile = path.join(paths.assets(), 'log_configs', version.logging.client.file.id);
+    if (!exists(logFile)) return { ok: false, reason: 'нет log4j-конфига' };
+  }
+  if (version.assetIndex) {
+    const indexFile = path.join(paths.assetsIndexes(), `${version.assetIndex.id}.json`);
+    if (!exists(indexFile)) return { ok: false, reason: 'нет индекса ресурсов' };
+    if (marker.assetsSignature !== assetsSignature()) {
+      return { ok: false, reason: 'ресурсы изменились' };
+    }
+  }
+  return { ok: true, marker };
+}
+
 async function installVersion(versionId, options = {}) {
   const onProgress = options.onProgress || (() => {});
   const settings = store.getSettings();
@@ -196,6 +290,21 @@ async function installVersion(versionId, options = {}) {
 
   onProgress({ stage: 'resolve', percent: 0, detail: 'Читаю описание версии' });
   const version = await resolveVersion(versionId);
+
+  if (!options.verify) {
+    const quick = quickInstallState(version);
+    if (quick.ok) {
+      onProgress({ stage: 'done', percent: 100, detail: 'Файлы на месте' });
+      return {
+        id: version.id,
+        javaMajor: (version.javaVersion && version.javaVersion.majorVersion) || 8,
+        assetsIndex: version.assetIndex ? version.assetIndex.id : null,
+        classpathEntries: [],
+        mainClass: version.mainClass,
+        instant: true,
+      };
+    }
+  }
 
   const tasks = [];
   const nativeJobs = [];
@@ -360,6 +469,13 @@ async function installVersion(versionId, options = {}) {
     }
   }
 
+  const stats = version.assetIndex ? { signature: assetsSignature() } : { signature: 'none' };
+  writeMarker(version.id, {
+    versionId: version.id,
+    assetIndexId: version.assetIndex ? version.assetIndex.id : null,
+    assetsSignature: stats.signature,
+  });
+
   onProgress({ stage: 'done', percent: 100, detail: 'Версия установлена' });
   return {
     id: version.id,
@@ -426,4 +542,6 @@ module.exports = {
   isVersionInstalled,
   installedVersions,
   readLocalVersionJson,
+  installState: async (id) => quickInstallState(await resolveVersion(id)),
+  assetsSignature,
 };

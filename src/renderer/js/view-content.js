@@ -475,7 +475,49 @@ window.Views.contentView = (config) => {
           body.append(strip);
         }
 
-        if (project.description) body.append(UI.el('p', { class: 'small muted' }, cleanText(project.description, 400)));
+        const descNode = project.description
+          ? UI.el('p', { class: 'small muted' }, cleanText(project.description, 400))
+          : null;
+        const translatedNote = UI.el('div', { class: 'small muted hidden', text: 'Переведено автоматически' });
+        const bodyWrap = project.body ? UI.el('div', { class: 'project-body', html: UI.md(project.body) }) : null;
+        const translateButton = UI.el(
+          'button',
+          {
+            class: 'btn sm ghost',
+            onclick: async () => {
+              translateButton.disabled = true;
+              const label = translateButton.textContent;
+              translateButton.textContent = 'Перевожу…';
+              try {
+                if (project.description) {
+                  const short = await UI.req(window.api.content.translate(project.description));
+                  if (short && short.text && descNode) descNode.textContent = short.text;
+                }
+                if (project.body) {
+                  const long = await UI.req(window.api.content.translate(project.body.slice(0, 4000)));
+                  if (long && long.text && bodyWrap) bodyWrap.innerHTML = UI.md(long.text);
+                }
+                translatedNote.classList.remove('hidden');
+              } catch (error) {
+                UI.toast(error.message, 'error', 7000);
+              }
+              translateButton.disabled = false;
+              translateButton.textContent = label;
+            },
+          },
+          'Перевести на русский',
+        );
+        if (descNode) body.append(descNode);
+        const settingsNow = (App.state && App.state.settings) || {};
+        const needsTranslation = Boolean(project.description && !/[а-яё]/i.test(project.description));
+        if (project.description || project.body) {
+          body.append(
+            UI.el('div', { class: 'row', style: { gap: '8px', alignItems: 'center' } }, translateButton, translatedNote),
+          );
+        }
+        if (settingsNow.translateDescriptions !== false && needsTranslation) {
+          setTimeout(() => translateButton.click(), 80);
+        }
 
         const versionSelect = UI.el('select', { class: 'select' });
         for (const version of versions.slice(0, 80)) {
@@ -497,10 +539,8 @@ window.Views.contentView = (config) => {
             UI.el('span', {}, 'Установка идёт в сборку — создайте её, чтобы скачивать.')));
         }
 
-        if (project.body) {
-          body.append(
-            UI.el('div', { class: 'project-body', html: UI.md(project.body) }),
-          );
+        if (bodyWrap) {
+          body.append(bodyWrap);
         }
 
         const foot = UI.el('div', { class: 'modal-foot' });
