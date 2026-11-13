@@ -1,0 +1,43 @@
+name: Discord
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Отправка релиза в #обновления
+        env:
+          TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHANNEL: '1570778932519899258'
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN}" ]; then
+            echo "Секрет DISCORD_BOT_TOKEN не задан — пропускаю."
+            exit 0
+          fi
+          BODY=$(jq -n \
+            --arg name "${{ github.event.release.name }}" \
+            --arg tag "${{ github.event.release.tag_name }}" \
+            --arg url "${{ github.event.release.html_url }}" \
+            --arg notes "${{ github.event.release.body }}" \
+            '{
+              embeds: [{
+                title: ($name // $tag),
+                url: $url,
+                color: 38400,
+                description: ($notes | .[0:3500]),
+                footer: { text: ("Релиз " + $tag) }
+              }]
+            }')
+          curl -sS -X POST "https://discord.com/api/v10/channels/${CHANNEL}/messages" \
+            -H "Authorization: Bot ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: KubikLauncher/1" \
+            -d "$BODY" -o /dev/null -w "discord: %{http_code}\n"

@@ -580,7 +580,21 @@ function registerIpc() {
   ipcMain.handle('versions:loaders', wrap(({ type, mcVersion }) => instances.loaderVersions(type, mcVersion)));
 
   ipcMain.handle('instances:list', wrap(() => instances.listInstances()));
-  ipcMain.handle('instances:create', wrap((options) => instances.createInstance(options)));
+  ipcMain.handle(
+    'instances:create',
+    wrap((options) => {
+      const created = instances.createInstance(options);
+      const globals = store.getSettings().globalOptions;
+      if (store.getSettings().syncGameOptions !== false && globals && Object.keys(globals).length) {
+        try {
+          gameOptions.write(created.id, globals);
+        } catch {
+          /* настройки не критичны для создания */
+        }
+      }
+      return created;
+    }),
+  );
   ipcMain.handle('instances:update', wrap(({ id, patch }) => instances.updateInstance(id, patch)));
   ipcMain.handle('instances:delete', wrap(async ({ id }) => {
     if (launcher.isRunning(id)) throw new Error('Сначала закройте игру — сборка запущена');
@@ -599,7 +613,31 @@ function registerIpc() {
   ipcMain.handle('instances:duplicate', wrap(({ id }) => instances.duplicateInstance(id)));
   ipcMain.handle('instances:size', wrap(({ id }) => instances.instanceSize(id)));
   ipcMain.handle('instances:options-get', wrap(({ id }) => gameOptions.read(id)));
-  ipcMain.handle('instances:options-save', wrap(({ id, patch }) => gameOptions.write(id, patch)));
+  ipcMain.handle(
+    'instances:options-save',
+    wrap(({ id, patch }) => {
+      const saved = gameOptions.write(id, patch);
+      if (store.getSettings().syncGameOptions !== false) {
+        const clean = {};
+        for (const [key, value] of Object.entries(patch || {})) {
+          if (value === undefined || value === null || value === '') continue;
+          clean[key] = String(value);
+        }
+        if (Object.keys(clean).length) {
+          store.saveSettings({ globalOptions: { ...(store.getSettings().globalOptions || {}), ...clean } });
+          for (const instance of instances.listInstances()) {
+            if (instance.id === id) continue;
+            try {
+              gameOptions.write(instance.id, clean);
+            } catch {
+              /* сборку могли удалить — пропускаем */
+            }
+          }
+        }
+      }
+      return saved;
+    }),
+  );
   ipcMain.handle('instances:open-folder', wrap(({ id }) => shell.openPath(paths.instanceDir(id))));
   ipcMain.handle(
     'instances:export',

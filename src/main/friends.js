@@ -7,6 +7,7 @@ const cloud = require('./cloud');
 const auth = require('./firebase-auth');
 
 const ONLINE_MS = 90 * 1000;
+const CODE_VERSION = 2;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function settings() {
@@ -144,6 +145,14 @@ async function ensureIdentity() {
     return '';
   }
   if (!uid) return '';
+  const previousCode = settings().friendCode || '';
+  if (Number(settings().codeVersion || 0) !== CODE_VERSION) {
+    const fresh = makeCode();
+    store.saveSettings({ friendCode: fresh, codeVersion: CODE_VERSION });
+    if (previousCode && previousCode !== fresh) {
+      cloud.removeDoc('codes', previousCode).catch(() => {});
+    }
+  }
   try {
     await cloud.patchDoc('users', myId(), { uid, code: myCode(), updated: Date.now() });
   } catch {

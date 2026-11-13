@@ -40,14 +40,17 @@ const DEFAULT_SETTINGS = {
   friendName: '',
   friendId: '',
   friendCode: '',
+  codeVersion: 0,
+  syncGameOptions: true,
+  globalOptions: {},
   friends: [],
   friendsRead: {},
   pinnedFriends: [],
   friendAbout: '',
   friendAvatar: '',
   friendBanner: '',
-  firebaseApiKey: '',
-  firebaseProjectId: '',
+  firebaseApiKey: 'AIzaSyDwtq429C-o8i2yONQIuXJs_XAwLY5EINY',
+  firebaseProjectId: 'kubik-launcher',
   curseforgeKey: '',
   javaCache: { byMajor: {} },
 };
@@ -74,6 +77,9 @@ function writeJson(file, data) {
 function load() {
   const rawSettings = readJson(paths.configFile(), {});
   settings = { ...DEFAULT_SETTINGS, ...secrets.revealSettings(rawSettings) };
+  // Пустые значения из старого конфига не должны затирать ключи по умолчанию.
+  if (!settings.firebaseApiKey) settings.firebaseApiKey = DEFAULT_SETTINGS.firebaseApiKey;
+  if (!settings.firebaseProjectId) settings.firebaseProjectId = DEFAULT_SETTINGS.firebaseProjectId;
   if (settings.resolution && typeof settings.resolution === 'object') {
     settings.resolution = { ...DEFAULT_SETTINGS.resolution, ...settings.resolution };
   }
