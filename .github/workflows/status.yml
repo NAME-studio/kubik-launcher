@@ -1,0 +1,111 @@
+﻿name: Status
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: status
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+      CHANNEL: '1570845242121392151'
+    steps:
+      - name: Проверить сайт, релиз и загрузки
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+
+          SITE_CODE=$(curl -sS -o /tmp/site.html -w '%{http_code}' --max-time 25 https://name-studio.github.io/kubik-launcher/ || echo 0)
+          SITE_OK=false
+          if [ "$SITE_CODE" = "200" ] && grep -qi "Kubik Launcher" /tmp/site.html; then SITE_OK=true; fi
+
+          REL=$(gh api "repos/${REPO}/releases/latest" 2>/dev/null || echo '{}')
+          TAG=$(printf '%s' "$REL" | jq -r '.tag_name // empty')
+          SETUP=$(printf '%s' "$REL" | jq -r '[.assets[].name] | map(select(test("Setup.*\\.exe$"))) | .[0] // empty')
+          SUMS=$(printf '%s' "$REL" | jq -r '[.assets[].name] | map(select(test("SHA256SUMS\\.txt$"))) | .[0] // empty')
+          PUBLISHED=$(printf '%s' "$REL" | jq -r '.published_at // empty')
+          URL=$(printf '%s' "$REL" | jq -r '[.assets[] | select(.name|test("SHA256SUMS\\.txt$")) | .browser_download_url] | .[0] // empty')
+
+          REL_OK=false
+          if [ -n "$TAG" ] && [ -n "$SETUP" ] && [ -n "$SUMS" ]; then REL_OK=true; fi
+
+          SUMS_CODE=0
+          if [ -n "$URL" ]; then SUMS_CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$URL" || echo 0); fi
+
+          STATE=ok
+          if [ "$SITE_OK" != "true" ] || [ "$REL_OK" != "true" ] || [ "$SUMS_CODE" != "200" ]; then STATE=bad; fi
+
+          {
+            echo "state=$STATE"
+            echo "site_code=$SITE_CODE"
+            echo "site_ok=$SITE_OK"
+            echo "rel_ok=$REL_OK"
+            echo "tag=$TAG"
+            echo "setup=$SETUP"
+            echo "sums=$SUMS"
+            echo "sums_code=$SUMS_CODE"
+            echo "published=$PUBLISHED"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Обновить сообщение в канале статуса
+        if: env.DISCORD_BOT_TOKEN != ''
+        env:
+          STATE: ${{ steps.check.outputs.state }}
+          SITE_CODE: ${{ steps.check.outputs.site_code }}
+          SITE_OK: ${{ steps.check.outputs.site_ok }}
+          REL_OK: ${{ steps.check.outputs.rel_ok }}
+          TAG: ${{ steps.check.outputs.tag }}
+          SETUP: ${{ steps.check.outputs.setup }}
+          SUMS: ${{ steps.check.outputs.sums }}
+          SUMS_CODE: ${{ steps.check.outputs.sums_code }}
+          PUBLISHED: ${{ steps.check.outputs.published }}
+        run: |
+          set -euo pipefail
+          API="https://discord.com/api/v10"
+          AUTH="Authorization: Bot ${DISCORD_BOT_TOKEN}"
+
+          mark () { if [ "$1" = "true" ]; then echo "✅"; else echo "❌"; fi; }
+          has () { if [ -n "$1" ]; then echo "true"; else echo "false"; fi; }
+
+          COLOR=3066993
+          TITLE="Всё работает"
+          if [ "$STATE" = "bad" ]; then COLOR=15158332; TITLE="Есть проблема"; fi
+
+          NOW=$(date -u '+%d.%m.%Y %H:%M UTC')
+          DESC=$(printf 'Сайт: %s (HTTP %s)\nРелиз: %s %s\nУстановщик: %s %s\nКонтрольные суммы: %s HTTP %s\nОпубликован: %s\n\nПроверено: %s' \
+            "$(mark "$SITE_OK")" "$SITE_CODE" \
+            "$(mark "$REL_OK")" "${TAG:-—}" \
+            "$(mark "$(has "$SETUP")")" "${SETUP:-—}" \
+            "$(mark "$(has "$SUMS")")" "$SUMS_CODE" \
+            "${PUBLISHED:-—}" "$NOW")
+
+          PAYLOAD=$(jq -nc --arg t "$TITLE" --arg d "$DESC" --argjson c "$COLOR" --arg tag "${TAG:-—}" \
+            '{content:"<!--status-report-->", embeds:[{title:$t, description:$d, color:$c, footer:{text:("Kubik Launcher " + $tag)}}]}')
+
+          LAST=$(curl -sS -H "$AUTH" "$API/channels/${CHANNEL}/messages?limit=10")
+          ID=$(printf '%s' "$LAST" | jq -r '[.[] | select(.content != null and (.content | test("status-report")))] | .[0].id // empty')
+
+          if [ -n "$ID" ]; then
+            CODE=$(curl -sS -o /tmp/out.json -w '%{http_code}' -X PATCH -H "$AUTH" -H 'Content-Type: application/json' -d "$PAYLOAD" "$API/channels/${CHANNEL}/messages/${ID}")
+          else
+            CODE=$(curl -sS -o /tmp/out.json -w '%{http_code}' -X POST -H "$AUTH" -H 'Content-Type: application/json' -d "$PAYLOAD" "$API/channels/${CHANNEL}/messages")
+          fi
+          echo "discord: $CODE"
+          if [ "$CODE" != "200" ] && [ "$CODE" != "201" ]; then cat /tmp/out.json; fi
+
+      - name: Секрет не задан
+        if: env.DISCORD_BOT_TOKEN == ''
+        run: echo "Секрет DISCORD_BOT_TOKEN не задан — отправку пропускаю."

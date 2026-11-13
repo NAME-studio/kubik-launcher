@@ -1,0 +1,71 @@
+name: Weekly stats
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-stats
+  cancel-in-progress: true
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    env:
+      DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+      CHANNEL: '1570845245107871907'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Посчитать установки за неделю
+        id: stats
+        run: |
+          set -uo pipefail
+          NOW=$(jq -r '.installs // empty' docs/stats.json 2>/dev/null || true)
+          if [ -z "$NOW" ]; then echo "Нет stats.json — пропускаю."; echo "present=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+
+          SHA=$(git log --before="7 days ago" -1 --format=%H -- docs/stats.json || true)
+          BEFORE=""
+          if [ -n "$SHA" ]; then BEFORE=$(git show "$SHA:docs/stats.json" 2>/dev/null | jq -r '.installs // empty' || true); fi
+
+          DELTA=0
+          if [ -n "$BEFORE" ]; then DELTA=$((NOW - BEFORE)); fi
+
+          {
+            echo "present=true"
+            echo "now=$NOW"
+            echo "before=${BEFORE:-0}"
+            echo "delta=$DELTA"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Отправить дайджест
+        if: steps.stats.outputs.present == 'true' && env.DISCORD_BOT_TOKEN != ''
+        env:
+          NOW: ${{ steps.stats.outputs.now }}
+          BEFORE: ${{ steps.stats.outputs.before }}
+          DELTA: ${{ steps.stats.outputs.delta }}
+        run: |
+          set -euo pipefail
+          API="https://discord.com/api/v10"
+          AUTH="Authorization: Bot ${DISCORD_BOT_TOKEN}"
+          WEEK=$(date -u '+%d.%m.%Y')
+
+          DESC=$(printf 'Всего установок: **%s**\nЗа неделю: **+%s**\nНеделю назад: %s\n\nЦифра приходит от лаунчера один раз при первом запуске — без id устройства и истории.' \
+            "$NOW" "$DELTA" "$BEFORE")
+
+          PAYLOAD=$(jq -nc --arg d "$DESC" --arg w "$WEEK" \
+            '{content:"", embeds:[{title:"Неделя лаунчера", description:$d, color:3447003, footer:{text:$w}}]}')
+
+          CODE=$(curl -sS -o /tmp/out.json -w '%{http_code}' -X POST -H "$AUTH" -H 'Content-Type: application/json' -d "$PAYLOAD" "$API/channels/${CHANNEL}/messages")
+          echo "discord: $CODE"
+          if [ "$CODE" != "200" ]; then cat /tmp/out.json; fi
+
+      - name: Секрет не задан
+        if: steps.stats.outputs.present == 'true' && env.DISCORD_BOT_TOKEN == ''
+        run: echo "Секрет DISCORD_BOT_TOKEN не задан — отправку пропускаю."
