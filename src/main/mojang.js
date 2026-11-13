@@ -31,19 +31,27 @@ const versionCache = new Map();
 async function getManifest(force = false) {
   if (manifestCache && !force && Date.now() - manifestTime < 10 * 60 * 1000) return manifestCache;
   const cacheFile = path.join(paths.cache(), 'version_manifest_v2.json');
+  const readCache = () => {
+    manifestCache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    manifestTime = Date.now();
+    return manifestCache;
+  };
+  if (!force && exists(cacheFile)) {
+    try {
+      if (Date.now() - fs.statSync(cacheFile).mtimeMs < 10 * 60 * 1000) return readCache();
+    } catch {
+      /* ignore */
+    }
+  }
   try {
-    const manifest = await net.fetchJson(MANIFEST_URL, { timeout: 30000 });
+    const manifest = await net.fetchJson(MANIFEST_URL, { timeout: exists(cacheFile) ? 12000 : 30000 });
     ensureDir(paths.cache());
     fs.writeFileSync(cacheFile, JSON.stringify(manifest));
     manifestCache = manifest;
     manifestTime = Date.now();
     return manifest;
   } catch (error) {
-    if (exists(cacheFile)) {
-      manifestCache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-      manifestTime = Date.now();
-      return manifestCache;
-    }
+    if (exists(cacheFile)) return readCache();
     throw error;
   }
 }
