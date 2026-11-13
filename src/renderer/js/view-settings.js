@@ -5,6 +5,10 @@ window.Views = window.Views || {};
 window.Views.settings = (() => {
   let unsubscribers = [];
 
+  const SITE_URL = 'https://name-studio.github.io/kubik-launcher/';
+  const GITHUB_URL = 'https://github.com/NAME-studio/kubik-launcher';
+  const BUGS_URL = `${GITHUB_URL}/issues/new?template=bug_report.yml`;
+
   async function save(patch) {
     try {
       const updated = await UI.req(window.api.settings.save(patch));
@@ -14,6 +18,61 @@ window.Views.settings = (() => {
       UI.toast(error.message, 'error');
       return null;
     }
+  }
+
+  function openAbout() {
+    const info = App.state.info || {};
+    const details = [
+      ['Версия лаунчера', info.version || '—'],
+      ['Electron', info.electron || '—'],
+      ['Chromium', info.chrome || '—'],
+      ['Node.js', info.node || '—'],
+      ['Платформа', info.platform === 'win32' ? 'Windows' : info.platform || '—'],
+      ['Папка лаунчера', info.root || '—'],
+    ];
+    const summary = [
+      `Kubik Launcher ${info.version || ''}`.trim(),
+      `Платформа: ${info.platform || ''}`,
+      `Electron ${info.electron || ''} / Chromium ${info.chrome || ''} / Node ${info.node || ''}`,
+      `Папка: ${info.root || ''}`,
+    ].join('\n');
+
+    const body = UI.el(
+      'div',
+      {},
+      ...details.map(([key, value]) => UI.el('div', { class: 'kv' }, UI.el('span', {}, key), UI.el('span', {}, value))),
+      UI.el(
+        'p',
+        { class: 'muted', style: { marginTop: '14px' } },
+        'Нашли ошибку? Откройте репорт на GitHub: приложите версию, шаги, что произошло, и лог из папки logs.',
+      ),
+      UI.el(
+        'div',
+        { class: 'row', style: { gap: '8px', flexWrap: 'wrap', marginTop: '10px' } },
+        UI.el('button', { class: 'btn sm', onclick: () => window.api.openExternal(SITE_URL) }, 'Сайт'),
+        UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(GITHUB_URL) }, 'GitHub'),
+        UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(BUGS_URL) }, 'Сообщить о баге'),
+        UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openPath(info.configDir || info.root) }, UI.icon('folder'), 'Логи и конфиг'),
+      ),
+    );
+
+    UI.modal({
+      title: `Kubik Launcher ${info.version || ''}`.trim(),
+      subtitle: 'Бесплатный лаунчер Minecraft: Fabric, Forge, NeoForge, Quilt, Modrinth и CurseForge',
+      body,
+      actions: [
+        {
+          label: 'Скопировать сведения',
+          kind: 'ghost',
+          onClick: () => {
+            window.api.copyText(summary);
+            UI.toast('Сведения скопированы', 'success');
+            return false;
+          },
+        },
+        { label: 'Закрыть', kind: 'primary' },
+      ],
+    });
   }
 
   function switchRow(title, description, value, onChange) {
@@ -600,7 +659,9 @@ window.Views.settings = (() => {
         UI.el(
           'div',
           { class: 'row', style: { marginTop: '12px', gap: '8px', flexWrap: 'wrap' } },
-          UI.el('button', { class: 'btn sm', onclick: () => window.api.openExternal('https://modrinth.com') }, 'Modrinth'),
+          UI.el('button', { class: 'btn sm', onclick: openAbout }, UI.icon('info'), 'О лаунчере'),
+          UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(BUGS_URL) }, 'Сообщить о баге'),
+          UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal('https://modrinth.com') }, 'Modrinth'),
           UI.el('button', { class: 'btn sm', onclick: () => window.api.openExternal('https://ely.by') }, 'Ely.by'),
           UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal('https://docs.ely.by/ru/minecraft-auth.html') }, 'Документация Ely.by'),
           UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openPath(info.root) }, UI.icon('folder'), 'Открыть папку'),

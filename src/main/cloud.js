@@ -2,6 +2,7 @@
 
 const https = require('https');
 const store = require('./store');
+const auth = require('./firebase-auth');
 
 const HOST = 'firestore.googleapis.com';
 
@@ -22,6 +23,11 @@ function resetBackoff() {
 
 function waitSeconds() {
   return Math.max(1, Math.ceil((blockedUntil - Date.now()) / 1000));
+}
+
+// Сколько ещё ждать; 0 — ограничений нет (waitSeconds всегда возвращает минимум 1).
+function blockedSeconds() {
+  return blockedUntil > Date.now() ? waitSeconds() : 0;
 }
 
 let blockedReason = '';
@@ -77,24 +83,31 @@ function base() {
   return `/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents`;
 }
 
-function request(path, { method = 'GET', body } = {}) {
+function request(path, { method = 'GET', body, retriedAuth = false } = {}) {
   if (Date.now() < blockedUntil) {
     const error = new Error(blockedReason === 'quota' ? quotaMessage() : `Firestore ограничил запросы (429). Повтор через ${waitSeconds()} с.`);
     error.status = 429;
     error.retryIn = waitSeconds();
     return Promise.reject(error);
   }
-  const send = () => rawRequest(path, { method, body });
+  const send = (forceToken = false) => rawRequest(path, { method, body, forceToken });
   return send().catch((error) => {
-    if (/ETIMEDOUT|EAI_AGAIN|ECONNRESET|timeout/i.test(String(error.message))) return send();
+    if (error.status === 401 && !retriedAuth) return request(path, { method, body, retriedAuth: true });
+    if (/ETIMEDOUT|EAI_AGAIN|ECONNRESET|timeout/i.test(String(error.message))) return send(retriedAuth);
     throw error;
   });
 }
 
-function rawRequest(path, { method = 'GET', body } = {}) {
+async function rawRequest(path, { method = 'GET', body, forceToken = false } = {}) {
   const { apiKey } = config();
+  const token = await auth.idToken({ force: forceToken }).catch(() => '');
   const payload = body ? JSON.stringify(body) : '';
   const url = `${base()}${path.startsWith(':') ? path : `/${path}`}${path.includes('?') ? '&' : '?'}key=${encodeURIComponent(apiKey)}`;
+  const headers = {
+    'content-type': 'application/json',
+    'content-length': Buffer.byteLength(payload),
+  };
+  if (token) headers.authorization = `Bearer ${token}`;
   return new Promise((resolve, reject) => {
     const req = https.request(
       {
@@ -102,10 +115,7 @@ function rawRequest(path, { method = 'GET', body } = {}) {
         path: url,
         method,
         family: 4,
-        headers: {
-          'content-type': 'application/json',
-          'content-length': Buffer.byteLength(payload),
-        },
+        headers,
         timeout: 20000,
       },
       (res) => {
@@ -126,7 +136,7 @@ function rawRequest(path, { method = 'GET', body } = {}) {
             resolve(parsed);
             return;
           }
-          if (process.env.KUBIK_CLOUD_DEBUG) console.log('[cloud]', method, url, res.statusCode, data.slice(0, 160));
+          if (process.env.KUBIK_CLOUD_DEBUG) console.log('[cloud]', method, url, res.statusCode, String(data).slice(0, 300), payload.slice(0, 160));
           const message = (parsed && parsed.error && parsed.error.message) || `Ошибка Firestore ${res.statusCode}`;
           if (res.statusCode === 429 || res.statusCode === 503) {
             const quota = /quota exceeded/i.test(message);
@@ -323,4 +333,4 @@ async function removeDoc(collection, id) {
   }
 }
 
-module.exports = { ready, config, getDoc, batchGet, setDoc, patchDoc, createDoc, query, removeDoc, blockedSeconds: () => waitSeconds() };
+module.exports = { ready, config, getDoc, batchGet, setDoc, patchDoc, createDoc, query, removeDoc, blockedSeconds };

@@ -1,0 +1,96 @@
+rules_version = '2';
+
+// Kubik Launcher — правила доступа Firestore.
+//
+// Как устроено:
+//   users/{uid} — писать может только владелец (поле uid = Firebase Anonymous uid).
+//                 Читать — любой вошедший, но только по точному uid документа;
+//                 перебор списком (list) закрыт, поэтому uid не узнать без кода друга.
+//   codes/{code}— справочник «код друга → uid»: читать может любой вошедший, писать только владелец.
+//   packs/{id}  — видят и получают только участники (массив members, автор всегда в нём);
+//                 менять содержимое — автор, участник может только выйти из сборки.
+//   всё прочее — закрыто.
+//
+// Временно:
+//   messages, chats — требуют вход, но участники пока не проверяются по uid.
+//   Как только id документов станут равны uid, заменить на проверку участника.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelfPath(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isOwner(resource) {
+      return signedIn() && resource != null && resource.data.uid == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      // Чужой профиль читается только по точному uid — его знает лишь тот, у кого есть код
+      // (справочник codes/{code} → uid). Перебор списком закрыт.
+      allow get: if signedIn();
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.code is string
+        && request.resource.data.code.size() == 6;
+
+      allow update: if (isSelfPath(userId) || isOwner(resource))
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+
+      match /private/{docId} {
+        allow read, write: if signedIn() && resource.data.uid == request.auth.uid;
+      }
+    }
+
+    match /codes/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if signedIn() && resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ВРЕМЕННО: только требует вход. Участники будут проверяться после перехода на uid.
+    match /messages/{messageId} {
+      allow read, write: if signedIn();
+    }
+
+    match /chats/{chatId} {
+      allow read, write: if signedIn();
+    }
+
+    match /packs/{packId} {
+      // Сборку видят только участники (создатель всегда входит в members).
+      allow get, list: if signedIn()
+        && resource.data.members is list
+        && resource.data.members.hasAny([request.auth.uid]);
+
+      allow create: if signedIn()
+        && request.resource.data.creatorUid == request.auth.uid
+        && request.resource.data.members is list
+        && request.resource.data.members.hasAny([request.auth.uid]);
+
+      // Автор меняет что угодно, участник — только список участников (выход из сборки).
+      allow update: if signedIn() && resource.data.creatorUid == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.members is list
+        && resource.data.members.hasAny([request.auth.uid])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'updated']);
+
+      allow delete: if signedIn() && resource.data.creatorUid == request.auth.uid;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,42 @@
+name: Идея или улучшение
+description: Предложение по функциям лаунчера
+title: "[идея] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Опишите, что хотелось бы получить и зачем. Если речь про чужой лаунчер — всё равно полезно: скажите, чем его решение удобнее.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Что неудобно сейчас
+      description: Какая задача не решается или решается долго
+      placeholder: Каждый раз приходится вручную переносить моды из другой сборки
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Как вы это видите
+      placeholder: Кнопка «Копировать моды в другую сборку» в меню сборки
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Что уже пробовали
+      description: Необязательно
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия лаунчера
+      placeholder: "1.2.0"
+    validations:
+      required: false

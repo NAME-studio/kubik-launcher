@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const paths = require('./paths');
+const secrets = require('./secrets');
 const { ensureDir } = require('./util');
 
 const DEFAULT_SETTINGS = {
@@ -71,12 +72,19 @@ function writeJson(file, data) {
 }
 
 function load() {
-  settings = { ...DEFAULT_SETTINGS, ...readJson(paths.configFile(), {}) };
+  const rawSettings = readJson(paths.configFile(), {});
+  settings = { ...DEFAULT_SETTINGS, ...secrets.revealSettings(rawSettings) };
   if (settings.resolution && typeof settings.resolution === 'object') {
     settings.resolution = { ...DEFAULT_SETTINGS.resolution, ...settings.resolution };
   }
-  accounts = readJson(paths.accountsFile(), { current: '', list: [] });
-  if (!Array.isArray(accounts.list)) accounts.list = [];
+  if (secrets.needsProtection(rawSettings, secrets.SETTINGS_FIELDS)) {
+    writeJson(paths.configFile(), secrets.protectSettings(settings));
+  }
+  const stored = readJson(paths.accountsFile(), { current: '', list: [] });
+  if (!Array.isArray(stored.list)) stored.list = [];
+  const encryptedStored = secrets.migrateAccounts(stored);
+  accounts = { ...stored, list: encryptedStored.data.list.map((account) => secrets.revealAccount(account)) };
+  if (encryptedStored.changed) writeJson(paths.accountsFile(), encryptedStored.data);
   if (!accounts.list.some((a) => a.id === accounts.current)) accounts.current = accounts.list[0]?.id || '';
   return getSettings();
 }
@@ -87,7 +95,7 @@ function getSettings() {
 
 function saveSettings(patch) {
   settings = { ...settings, ...patch };
-  writeJson(paths.configFile(), settings);
+  writeJson(paths.configFile(), secrets.protectSettings(settings));
   listeners.forEach((fn) => fn(settings));
   return settings;
 }
@@ -100,26 +108,30 @@ function currentAccount() {
   return accounts.list.find((a) => a.id === accounts.current) || null;
 }
 
+function persistAccounts() {
+  writeJson(paths.accountsFile(), { ...accounts, list: accounts.list.map((account) => secrets.protectAccount(account)) });
+}
+
 function saveAccount(account) {
   const idx = accounts.list.findIndex((a) => a.id === account.id);
   if (idx >= 0) accounts.list[idx] = { ...accounts.list[idx], ...account };
   else accounts.list.push(account);
   accounts.current = account.id;
-  writeJson(paths.accountsFile(), accounts);
+  persistAccounts();
   return accounts;
 }
 
 function removeAccount(id) {
   accounts.list = accounts.list.filter((a) => a.id !== id);
   if (accounts.current === id) accounts.current = accounts.list[0]?.id || '';
-  writeJson(paths.accountsFile(), accounts);
+  persistAccounts();
   return accounts;
 }
 
 function setCurrent(id) {
   if (accounts.list.some((a) => a.id === id)) {
     accounts.current = id;
-    writeJson(paths.accountsFile(), accounts);
+    persistAccounts();
   }
   return accounts;
 }

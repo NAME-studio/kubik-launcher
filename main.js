@@ -22,6 +22,9 @@ app.setPath('sessionData', path.join(USER_DATA, 'cache', 'chromium'));
 
 const paths = require('./src/main/paths');
 const store = require('./src/main/store');
+const secrets = require('./src/main/secrets');
+const { isNetworkError } = require('./src/main/neterr');
+const firebaseAuth = require('./src/main/firebase-auth');
 const mojang = require('./src/main/mojang');
 const instances = require('./src/main/instances');
 const launcher = require('./src/main/launch');
@@ -34,6 +37,7 @@ const gameOptions = require('./src/main/options');
 const crash = require('./src/main/crash');
 const serverPing = require('./src/main/servers');
 const curseforge = require('./src/main/curseforge');
+const packfile = require('./src/main/packfile');
 const friends = require('./src/main/friends');
 const rpc = require('./src/main/rpc');
 const updater = require('./src/main/updater');
@@ -450,6 +454,23 @@ function registerIpc() {
 
   ipcMain.handle('app:open-external', wrap(({ url }) => shell.openExternal(url)));
   ipcMain.handle(
+    'app:secrets',
+    wrap(() => {
+      const available = secrets.available();
+      const sample = 'kubik-secret';
+      const roundTrip = secrets.reveal(secrets.protect(sample)) === sample;
+      return { available, roundTrip };
+    }),
+  );
+  ipcMain.handle(
+    'app:firebase-auth',
+    wrap(async () => {
+      // Ошибку пробрасываем — обёртка wrap сама вернёт {ok:false,error}, без двойного ok.
+      const session = await firebaseAuth.ensureSession();
+      return { uid: session.uid || '' };
+    }),
+  );
+  ipcMain.handle(
     'app:set-autostart',
     wrap(({ enabled }) => {
       const on = Boolean(enabled);
@@ -495,11 +516,19 @@ function registerIpc() {
   ipcMain.handle(
     'settings:save',
     wrap((patch) => {
+      const previous = store.getSettings();
       if (patch.root !== undefined) {
         store.saveSettings(patch);
         initRoot();
       } else {
         store.saveSettings(patch);
+      }
+      // Сменили проект или ключ Firebase — старый токен чужой сессии больше не годится.
+      if (
+        (patch.firebaseApiKey !== undefined && patch.firebaseApiKey !== previous.firebaseApiKey) ||
+        (patch.firebaseProjectId !== undefined && patch.firebaseProjectId !== previous.firebaseProjectId)
+      ) {
+        firebaseAuth.reset();
       }
       return store.getSettings();
     }),
@@ -590,12 +619,14 @@ function registerIpc() {
     'instances:import',
     wrap(async () => {
       const result = await dialog.showOpenDialog(mainWindow, {
-        title: 'Импорт сборки',
-        filters: [{ name: 'Архив сборки', extensions: ['zip'] }],
+        title: 'Импорт сборки или модпака',
+        filters: [{ name: 'Архив сборки или модпака', extensions: ['zip', 'mrpack'] }],
         properties: ['openFile'],
       });
       if (result.canceled || !result.filePaths.length) return null;
-      const instance = instances.importInstance(result.filePaths[0]);
+      const file = result.filePaths[0];
+      const packed = await packfile.importFile(file, { onProgress: progressFor(null, 'modpack:progress') });
+      const instance = packed ? packed.instance : instances.importInstance(file);
       emit('instances:changed', {});
       return instance;
     }),
@@ -658,11 +689,22 @@ function registerIpc() {
       let account = store.currentAccount();
       if (!account) throw new Error('Сначала выберите аккаунт — офлайн, Ely.by или Microsoft');
       const authStart = Date.now();
-      if (account.type === 'ely') {
-        const valid = await ely.validateCached(account);
-        if (!valid) account = await ely.refresh(account);
-      } else if (account.type === 'microsoft') {
-        account = await microsoft.refresh(account);
+      let offlineMode = false;
+      try {
+        if (account.type === 'ely') {
+          const valid = await ely.validateCached(account);
+          if (!valid) account = await ely.refresh(account);
+        } else if (account.type === 'microsoft') {
+          account = await microsoft.refresh(account);
+        }
+      } catch (error) {
+        if (!isNetworkError(error)) throw error;
+        offlineMode = true;
+        emit('launch:log', {
+          instanceId,
+          text: 'Нет связи с сервером входа — запускаю на сохранённом аккаунте (офлайн).',
+          stream: 'stderr',
+        });
       }
       console.log('[timing] launch:auth', Date.now() - authStart);
       const settings = store.getSettings();
@@ -688,6 +730,15 @@ function registerIpc() {
         });
       } catch (error) {
         setTaskbarProgress(-1);
+        if (isNetworkError(error)) {
+          const friendly = new Error(
+            offlineMode
+              ? 'Нет интернета, а часть файлов сборки ещё не скачана. Подключитесь к сети один раз, чтобы докачать файлы.'
+              : 'Нет связи с серверами Minecraft. Проверьте интернет и попробуйте снова.',
+          );
+          friendly.code = 'offline';
+          throw friendly;
+        }
         throw error;
       }
       if (settings.closeOnLaunch) {
@@ -820,6 +871,7 @@ function registerIpc() {
   ipcMain.handle('content:search', wrap((options) => modrinth.search(options)));
   ipcMain.handle('content:curse-search', wrap((options) => curseforge.search(options)));
   ipcMain.handle('content:curse-status', wrap(() => ({ hasKey: curseforge.hasKey() })));
+  ipcMain.handle('content:curse-project', wrap(({ modId }) => curseforge.details(modId)));
   ipcMain.handle(
     'content:curse-install',
     wrap(({ instanceId, modId, projectType }) => {
@@ -858,6 +910,15 @@ function registerIpc() {
     'content:modpack-install',
     wrap(({ projectId, versionId, name }) =>
       modrinth.installModpack(projectId, versionId, {
+        name,
+        onProgress: progressFor(null, 'modpack:progress'),
+      }),
+    ),
+  );
+  ipcMain.handle(
+    'content:curse-modpack-install',
+    wrap(({ modId, name }) =>
+      curseforge.installModpack(modId, {
         name,
         onProgress: progressFor(null, 'modpack:progress'),
       }),

@@ -21,6 +21,8 @@ function invoke(channel, payload) {
 contextBridge.exposeInMainWorld('api', {
   info: () => invoke('app:info'),
   openExternal: (url) => invoke('app:open-external', { url }),
+  secrets: () => invoke('app:secrets'),
+  firebaseAuth: () => invoke('app:firebase-auth'),
   openPath: (target) => invoke('app:open-path', { target }),
   copyText: (text) => invoke('app:copy-text', { text }),
   pickFolder: (title) => invoke('app:pick-folder', { title }),
@@ -155,7 +157,9 @@ contextBridge.exposeInMainWorld('api', {
   content: {
     curseStatus: () => invoke('content:curse-status'),
     curseSearch: (options) => invoke('content:curse-search', options),
+    curseProject: (modId) => invoke('content:curse-project', { modId }),
     curseInstall: (instanceId, modId, projectType) => invoke('content:curse-install', { instanceId, modId, projectType }),
+    curseModpackInstall: (modId, name) => invoke('content:curse-modpack-install', { modId, name }),
     search: (options) => invoke('content:search', options),
     project: (id) => invoke('content:project', { id }),
     translate: (text, to) => invoke('content:translate', { text, to }),

@@ -69,6 +69,18 @@ function readFile(zipPath, entryName, buf) {
   return readEntry(source, entry);
 }
 
+// Путь из архива не должен выходить за пределы папки назначения
+// (защита от ../, абсолютных путей и дисков вида C:).
+function safeJoin(baseDir, relative) {
+  const rel = String(relative || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!rel) return null;
+  if (rel.includes('..') || /^[a-zA-Z]:/.test(rel)) return null;
+  const root = path.resolve(baseDir);
+  const full = path.resolve(root, rel);
+  if (full !== root && !full.startsWith(root + path.sep)) return null;
+  return full;
+}
+
 function extract(zipPath, destDir, options = {}) {
   const buf = fs.readFileSync(zipPath);
   const entries = readEntries(buf);
@@ -88,11 +100,13 @@ function extract(zipPath, destDir, options = {}) {
       target = target.split('/').slice(strip).join('/');
     }
     if (!target || target.endsWith('/')) {
-      if (target) ensureDir(path.join(destDir, target));
+      const dir = target ? safeJoin(destDir, target) : null;
+      if (dir) ensureDir(dir);
       continue;
     }
     if (options.filter && !options.filter(target)) continue;
-    const full = path.join(destDir, target);
+    const full = safeJoin(destDir, target);
+    if (!full) continue;
     ensureDir(path.dirname(full));
     const data = readEntry(buf, entry);
     fs.writeFileSync(full, data);
@@ -108,4 +122,4 @@ function readJson(zipPath, entryName) {
   return JSON.parse(data.toString('utf8'));
 }
 
-module.exports = { list, readFile, readJson, extract };
+module.exports = { list, readFile, readJson, extract, safeJoin };

@@ -1,0 +1,93 @@
+name: Баг в лаунчере
+description: Что-то сломалось или работает не так, как ожидалось
+title: "[баг] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за репорт. Чем точнее данные, тем быстрее получится исправить.
+
+        Версию и сведения о системе можно скопировать в лаунчере: **Настройки → О лаунчере → Скопировать сведения**.
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия лаунчера
+      description: Например, 1.2.0
+      placeholder: "1.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Версия Windows
+      description: Например, Windows 11 23H2 или Windows 10 22H2
+      placeholder: "Windows 11 23H2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Что вы делали
+      description: Пошагово, чтобы ошибку можно было повторить
+      placeholder: |
+        1. Открыл «Сборки»
+        2. Создал сборку 1.21.1 с Fabric
+        3. Нажал «Играть»
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидали
+      placeholder: Игра должна запуститься
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Что произошло на самом деле
+      description: Текст ошибки, что видно на экране
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Лог
+      description: |
+        Файл из папки `logs` (кнопка «Логи и конфиг» в окне «О лаунчере»).
+        Можно перетащить файл сюда или вставить последние 50 строк.
+      render: shell
+    validations:
+      required: false
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Какой загрузчик использовался
+      multiple: true
+      options:
+        - Ванилла
+        - Fabric
+        - Forge
+        - NeoForge
+        - Quilt
+        - Не знаю
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Проверка
+      options:
+        - label: Я скачал лаунчер с официального сайта или GitHub Releases
+          required: false
+        - label: Такая ошибка ещё не описана в существующих репортах
+          required: false

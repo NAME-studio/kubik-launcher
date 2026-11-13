@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Сайт лаунчера
+    url: https://name-studio.github.io/kubik-launcher/
+    about: Описание возможностей, скриншоты и инструкция по установке
+  - name: Политика конфиденциальности
+    url: https://name-studio.github.io/kubik-launcher/privacy.html
+    about: Какие данные лаунчер хранит локально и куда обращается

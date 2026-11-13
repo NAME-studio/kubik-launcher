@@ -4,6 +4,7 @@ const store = require('./store');
 const instances = require('./instances');
 const modrinth = require('./modrinth');
 const cloud = require('./cloud');
+const auth = require('./firebase-auth');
 
 const ONLINE_MS = 90 * 1000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -26,6 +27,8 @@ function newId() {
 }
 
 function myId() {
+  const uid = auth.uid();
+  if (uid) return uid;
   const current = settings().friendId;
   if (current) return current;
   const id = newId();
@@ -66,8 +69,95 @@ function configured() {
   return cloud.ready();
 }
 
-async function publish(doc = {}) {
-  if (!configured()) return null;
+async function migrateIdentity() {
+  if (!configured()) return '';
+  let uid = '';
+  try {
+    uid = (await auth.ensureSession()).uid || '';
+  } catch {
+    return '';
+  }
+  if (!uid) return '';
+
+  const legacy = String(settings().friendId || '');
+  let merged = { uid, code: myCode(), name: myName() || myCode(), updated: Date.now() };
+  if (legacy && legacy !== uid) {
+    try {
+      const old = await cloud.getDoc('users', legacy);
+      if (old) merged = { ...old, ...merged };
+    } catch {
+      /* старый документ недоступен — начнём с чистого */
+    }
+  }
+
+  const localIds = friendList().map((f) => f.id).filter(Boolean);
+  const ids = new Set([...(Array.isArray(merged.friends) ? merged.friends : []), ...localIds]);
+  const map = new Map();
+  for (const id of ids) {
+    if (!id || id === uid || id === legacy) continue;
+    try {
+      const doc = await cloud.getDoc('users', id);
+      if (doc && doc.uid && doc.uid !== id) map.set(id, doc.uid);
+    } catch {
+      /* нет доступа — оставляем прежний id */
+    }
+  }
+  const remap = (id) => map.get(id) || id;
+  const remappedLocal = localIds.map(remap);
+  merged.friends = [...new Set([...(Array.isArray(merged.friends) ? merged.friends : []).map(remap), ...remappedLocal])]
+    .filter((id) => id && id !== uid);
+  merged.friendId = legacy || uid;
+
+  if (settings().identityMigrated === uid) {
+    try {
+      const current = await cloud.getDoc('users', uid);
+      const have = new Set(Array.isArray(current && current.friends) ? current.friends : []);
+      if (remappedLocal.every((id) => have.has(id))) return uid;
+    } catch {
+      /* прочитаем заново на следующем старте */
+    }
+  }
+
+
+  saveFriendList(friendList().map((friend) => ({ ...friend, id: remap(friend.id) })));
+  try {
+    await cloud.setDoc('users', uid, merged);
+  } catch {
+    /* документ создастся при следующем heartbeat */
+  }
+  try {
+    await cloud.setDoc('codes', myCode(), { uid, friendId: legacy || uid, at: Date.now() });
+  } catch {
+    /* codes начнёт работать после публикации правил */
+  }
+  store.saveSettings({ identityMigrated: uid });
+  return uid;
+}
+
+async function ensureIdentity() {
+  if (!configured()) return '';
+  let uid = '';
+  try {
+    const session = await auth.ensureSession();
+    uid = session.uid || '';
+  } catch {
+    return '';
+  }
+  if (!uid) return '';
+  try {
+    await cloud.patchDoc('users', myId(), { uid, code: myCode(), updated: Date.now() });
+  } catch {
+    /* правила могут запрещать — не блокируем работу */
+  }
+  try {
+    await cloud.setDoc('codes', myCode(), { uid, friendId: myId(), at: Date.now() });
+  } catch {
+    /* справочник кодов появится после публикации правил */
+  }
+  return uid;
+}
+
+async function publish(doc = {}) {  if (!configured()) return null;
   const patch = {
     name: myName() || myCode(),
     code: myCode(),
@@ -106,11 +196,13 @@ function statusFromLaunch(payload) {
 
 async function readMessages(peerId) {
   if (!configured() || !peerId) return [];
+  // Без orderBy: равенство по pair + сортировка по at требует составного индекса Firestore,
+  // без него запрос падает. Объёма в 300 сообщений на пару хватает, лишнее режем по времени.
   const rows = await cloud.query('messages', {
     where: [{ field: 'pair', op: 'EQUAL', value: pairId(myId(), peerId) }],
     limit: 300,
   });
-  return rows.sort((a, b) => (a.at || 0) - (b.at || 0));
+  return rows.sort((a, b) => (a.at || 0) - (b.at || 0)).slice(-200);
 }
 
 async function send({ friendId, text, kind, payload }) {
@@ -137,6 +229,7 @@ async function send({ friendId, text, kind, payload }) {
       lastAt: (doc && doc.at) || Date.now(),
     })
     .catch(() => {});
+  invalidateState();
   return doc;
 }
 
@@ -145,12 +238,18 @@ async function addFriend(rawCode) {
   const code = String(rawCode || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length < 4) throw new Error('Код слишком короткий');
   if (code === myCode()) throw new Error('Это ваш собственный код');
-  const rows = await cloud.query('users', {
-    where: [{ field: 'code', op: 'EQUAL', value: code }],
-    limit: 5,
-  });
-  const found = rows.find((row) => row.id !== myId());
-  if (!found) throw new Error('Такой код не найден. Друг должен запустить лаунчер и открыть «Друзья»');
+
+  const entry = await cloud.getDoc('codes', code).catch(() => null);
+  const targetId = entry && entry.uid;
+  if (!targetId) {
+    throw new Error('Такой код не найден. Друг должен запустить лаунчер и открыть «Друзья»');
+  }
+  if (targetId === myId()) throw new Error('Это ваш собственный код');
+
+  const found = await cloud.getDoc('users', targetId).catch(() => null);
+  if (!found) {
+    throw new Error('Друг ещё не открыл «Друзья» в новой версии лаунчера — попросите его обновиться');
+  }
 
   const mine = (await cloud.getDoc('users', myId())) || {};
   const myFriends = new Set(Array.isArray(mine.friends) ? mine.friends : []);
@@ -165,12 +264,14 @@ async function addFriend(rawCode) {
   const theirs = new Set(Array.isArray(found.friends) ? found.friends : []);
   if (!theirs.has(myId())) {
     theirs.add(myId());
-    await cloud.patchDoc('users', found.id, { friends: [...theirs] });
+    // Записывать в документ друга новые правила не дают: дружба становится заявкой,
+    // вторая сторона добавляет нас сама, когда откроет «Друзей».
   }
 
   const list = friendList().filter((friend) => friend.id !== found.id);
   list.push({ id: found.id, name: found.name || code });
   saveFriendList(list);
+  invalidateState();
   return { id: found.id, name: found.name || code };
 }
 
@@ -182,14 +283,11 @@ async function removeFriend(friendId) {
       const mine = (await cloud.getDoc('users', myId())) || {};
       const myFriends = (Array.isArray(mine.friends) ? mine.friends : []).filter((id) => id !== friendId);
       await cloud.patchDoc('users', myId(), { friends: myFriends });
-      const peer = await cloud.getDoc('users', friendId);
-      if (peer && Array.isArray(peer.friends)) {
-        await cloud.patchDoc('users', friendId, { friends: peer.friends.filter((id) => id !== myId()) });
-      }
     } catch {
       /* локальный список уже обновлён */
     }
   }
+  invalidateState();
   return true;
 }
 
@@ -204,13 +302,73 @@ async function cloudFriendIds() {
   }
 }
 
+async function myPackIds() {
+  const ids = new Set();
+  let known = null;
+  try {
+    const mine = await cloud.getDoc('users', myId());
+    if (mine && Array.isArray(mine.sharedPacks)) {
+      known = mine.sharedPacks;
+      for (const id of known) {
+        if (id) ids.add(id);
+      }
+    }
+  } catch {
+    /* список пересоберётся из локальных сборок */
+  }
+  if (!known) {
+    try {
+      for (const instance of instances.listInstances()) {
+        if (instance && instance.sharedPack) ids.add(instance.sharedPack);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return [...ids];
+}
+
+async function rememberPack(packId, joined) {
+  if (!packId) return;
+  try {
+    const ids = new Set(await myPackIds());
+    if (joined) ids.add(packId);
+    else ids.delete(packId);
+    await cloud.patchDoc('users', myId(), {
+      name: myName() || myCode(),
+      code: myCode(),
+      sharedPacks: [...ids],
+      updated: Date.now(),
+    });
+  } catch {
+    /* список общих сборок не мешает запуску игры */
+  }
+}
+
+function forgetLocalPack(packId) {
+  try {
+    for (const instance of instances.listInstances()) {
+      if (instance && instance.sharedPack === packId) {
+        instances.updateInstance(instance.id, { sharedPack: null });
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 async function listPacks() {
   if (!configured()) return [];
-  const rows = await cloud.query('packs', {
-    where: [{ field: 'members', op: 'ARRAY_CONTAINS', value: myId() }],
-    limit: 50,
-  });
-  return rows.sort((a, b) => (b.updated || 0) - (a.updated || 0));
+  const ids = await myPackIds();
+  if (!ids.length) return [];
+  let map = {};
+  try {
+    map = await cloud.batchGet('packs', ids);
+  } catch (error) {
+    if (error.status === 429) throw error;
+    return [];
+  }
+  return Object.values(map).sort((a, b) => (b.updated || 0) - (a.updated || 0));
 }
 
 async function readPack(packId) {
@@ -240,6 +398,7 @@ async function sharePack({ instanceId, friendIds }) {
     loader: JSON.stringify(instance.loader || { type: 'vanilla', version: null }),
     cover: instance.cover || 'autumn',
     creator: myId(),
+    creatorUid: auth.uid(),
     creatorName: myName() || myCode(),
     members: [myId(), ...(friendIds || []).filter(Boolean)],
     mods,
@@ -250,6 +409,7 @@ async function sharePack({ instanceId, friendIds }) {
   } catch {
     /* ignore */
   }
+  await rememberPack(pack.id, true);
   for (const friendId of friendIds || []) {
     await send({
       friendId,
@@ -284,6 +444,7 @@ async function addPack({ packId }) {
   } catch {
     /* ignore */
   }
+  await rememberPack(pack.id, true);
   const failures = [];
   for (const mod of pack.mods || []) {
     try {
@@ -413,6 +574,7 @@ function markRead({ friendId }) {
   const map = { ...(settings().friendsRead || {}) };
   map[friendId] = Date.now();
   store.saveSettings({ friendsRead: map });
+  invalidateState();
   return true;
 }
 
@@ -428,23 +590,35 @@ async function setup({ name, about }) {
     friendAbout: String(about || '').trim().slice(0, 140),
   });
   await publish({ status: { state: 'launcher', at: Date.now() } });
+  invalidateState();
   return { id: myId(), code: myCode(), name: trimmed };
 }
 
 async function clearChat({ friendId }) {
   if (!configured()) throw new Error('Firebase не настроен');
   if (!friendId) throw new Error('Не выбран друг');
+  const chatId = pairId(myId(), friendId);
   const rows = await cloud.query('messages', {
-    where: [{ field: 'pair', op: 'EQUAL', value: pairId(myId(), friendId) }],
+    where: [{ field: 'pair', op: 'EQUAL', value: chatId }],
     limit: 300,
   });
-  for (const row of rows) {
-    await cloud.removeDoc('messages', row.id);
+  // Пачками по 20, чтобы не упираться в лимит запросов и не терять уже удалённое.
+  let removed = 0;
+  for (let i = 0; i < rows.length; i += 20) {
+    const chunk = rows.slice(i, i + 20);
+    const results = await Promise.allSettled(chunk.map((row) => cloud.removeDoc('messages', row.id)));
+    removed += results.filter((result) => result.status === 'fulfilled').length;
+  }
+  try {
+    await cloud.patchDoc('chats', chatId, { lastAt: 0, lastText: '', lastKind: '', lastFrom: '' });
+  } catch {
+    /* сводка чата обновится следующим сообщением */
   }
   const readMap = { ...(settings().friendsRead || {}) };
   readMap[friendId] = Date.now();
   store.saveSettings({ friendsRead: readMap });
-  return { removed: rows.length };
+  invalidateState();
+  return { removed };
 }
 
 async function friendProfile({ friendId }) {
@@ -505,10 +679,14 @@ async function leavePack({ packId }) {
   const me = myId();
   if (pack.creator === me) {
     await cloud.removeDoc('packs', packId);
+    forgetLocalPack(packId);
+    await rememberPack(packId, false);
     return { deleted: true, packName: pack.name || '' };
   }
   const members = (pack.members || []).filter((id) => id !== me);
   await cloud.patchDoc('packs', packId, { members, updated: Date.now() });
+  forgetLocalPack(packId);
+  await rememberPack(packId, false);
   return { deleted: false, packName: pack.name || '', members: members.length };
 }
 
@@ -571,6 +749,12 @@ let stateCache = { at: 0, data: null };
 let beatTimer = null;
 let syncTimer = null;
 
+// После любого действия (сообщение, друг, сборка) кэш состояния должен сброситься,
+// иначе UI ещё 10 секунд показывает старые данные.
+function invalidateState() {
+  stateCache = { at: 0, data: null };
+}
+
 async function refreshSummary() {
   try {
     const data = await state();
@@ -605,6 +789,9 @@ function stopSync() {
 function startSync(window, getStatus) {
   stopSync();
   if (!configured()) return;
+  migrateIdentity()
+    .then(() => ensureIdentity())
+    .catch(() => {});
   const beat = () => {
     try {
       if (!configured()) return;
@@ -639,6 +826,8 @@ module.exports = {
   refreshSummary,
   startSync,
   stopSync,
+  ensureIdentity,
+  migrateIdentity,
   heartbeat,
   statusFromLaunch,
   send,

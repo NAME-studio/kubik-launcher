@@ -55,7 +55,7 @@ window.Views.contentView = (config) => {
     return {
       projectType: config.type,
       gameVersion: needsInstance && instance && !s.anyVersion ? instance.mcVersion : null,
-      loader: needsInstance && !s.anyVersion && config.type === 'mod' && instance && instance.loader.type !== 'vanilla' ? instance.loader.type : null,
+      loader: needsInstance && !s.anyVersion && config.type === 'mod' && instance && (instance.loader || {}).type && instance.loader.type !== 'vanilla' ? instance.loader.type : null,
       query: s.query,
       index: s.sort,
       limit: 12,
@@ -148,8 +148,23 @@ window.Views.contentView = (config) => {
     if (!App.requireAccount('Создайте аккаунт, чтобы скачивать — это бесплатно')) return;
     if (item.source === 'curse') {
       if (config.type === 'modpack') {
-        UI.toast('Модпаки CurseForge открываются на сайте — установка архивов появится позже', 'info', 6000);
-        window.api.openExternal(`https://www.curseforge.com/minecraft/search?search=${encodeURIComponent(item.title)}`);
+        button.disabled = true;
+        button.textContent = 'Ставлю…';
+        try {
+          const result = await UI.req(window.api.content.curseModpackInstall(item.curseId, item.title));
+          await App.reloadInstances();
+          App.setInstance(result.instance.id);
+          const failed = (result.failures || []).length;
+          UI.toast(
+            failed ? `Модпак установлен, ${failed} файлов не скачались` : `Модпак «${item.title}» установлен`,
+            failed ? 'info' : 'success',
+          );
+          App.refresh();
+        } catch (error) {
+          UI.toast(error.message, 'error', 8000);
+          button.disabled = false;
+          button.textContent = 'Скачать';
+        }
         return;
       }
       const target = currentInstance();
@@ -199,7 +214,7 @@ window.Views.contentView = (config) => {
       App.createInstanceDialog();
       return;
     }
-    if (config.type === 'mod' && instance.loader.type === 'vanilla') {
+    if (config.type === 'mod' && instance && (instance.loader || {}).type === 'vanilla') {
       UI.toast('В сборке нет загрузчика модов — мод не загрузится в игре', 'info', 7000);
     }
     button.disabled = true;
@@ -258,7 +273,7 @@ window.Views.contentView = (config) => {
 
   function openItem(item) {
     if (item.source === 'curse') {
-      window.api.openExternal(`https://www.curseforge.com/minecraft/search?search=${encodeURIComponent(item.title)}`);
+      openCurseProject(item);
       return;
     }
     openProject(item.id);
@@ -439,6 +454,138 @@ window.Views.contentView = (config) => {
     host.append(list);
   }
 
+  function htmlToText(text) {
+    return String(text || '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '• ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#(\d+);/g, (match, code) => String.fromCharCode(Number(code)))
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function openCurseProject(item) {
+    const body = UI.el('div', { class: 'stack' }, UI.el('div', { class: 'skeleton', style: { minHeight: '160px' } }));
+    UI.modal({ title: item.title || 'Загрузка…', subtitle: 'CurseForge', wide: true, body, actions: [{ label: 'Закрыть', kind: 'ghost' }] });
+
+    (async () => {
+      try {
+        const project = await UI.req(window.api.content.curseProject(item.curseId));
+        UI.clear(body);
+
+        const installedItem = s.installed
+          ? (s.installed.items || []).find((entry) => entry.projectId === project.id && entry.projectType === config.type)
+          : null;
+
+        body.append(
+          UI.el(
+            'div',
+            { class: 'row', style: { alignItems: 'flex-start', gap: '14px' } },
+            item.icon ? UI.el('img', { class: 'mod-icon', style: { width: '76px', height: '76px' }, src: item.icon }) : iconPlaceholder(),
+            UI.el(
+              'div',
+              { class: 'grow' },
+              UI.el('div', { style: { fontSize: '18px', fontWeight: '650' } }, project.title || item.title),
+              UI.el(
+                'div',
+                { class: 'row', style: { gap: '6px', flexWrap: 'wrap', marginTop: '8px' } },
+                UI.el('span', { class: `badge accent${installedItem ? '' : ' hidden'}` }, UI.icon('check'), 'Установлено'),
+                UI.el('span', { class: 'badge accent' }, UI.icon('download'), UI.num(project.downloads || 0)),
+                project.author ? UI.el('span', { class: 'badge', text: project.author }) : null,
+                ...(project.categories || []).slice(0, 3).map((cat) => UI.el('span', { class: 'badge', text: cat })),
+                project.updated ? UI.el('span', { class: 'badge', text: `обновлён ${UI.date(project.updated)}` }) : null,
+              ),
+            ),
+          ),
+        );
+
+        const gallery = (project.gallery || []).slice(0, 6);
+        if (gallery.length) {
+          const strip = UI.el('div', { class: 'gallery' });
+          for (const image of gallery) strip.append(UI.el('img', { src: image.url, alt: image.title || '', loading: 'lazy' }));
+          body.append(strip);
+        }
+
+        const fullText = htmlToText(project.description).slice(0, 6000);
+        const descNode = UI.el('div', { class: 'project-body', style: { whiteSpace: 'pre-wrap' } }, fullText || 'Описание не указано.');
+        body.append(descNode);
+
+        const translatedNote = UI.el('div', { class: 'small muted hidden', text: 'Переведено автоматически' });
+        const translateButton = UI.el(
+          'button',
+          {
+            class: 'btn sm ghost',
+            onclick: async () => {
+              translateButton.disabled = true;
+              const label = translateButton.textContent;
+              translateButton.textContent = 'Перевожу…';
+              try {
+                const short = await UI.req(window.api.content.translate(fullText));
+                if (short && short.text) descNode.textContent = short.text;
+                translatedNote.classList.remove('hidden');
+              } catch (error) {
+                UI.toast(error.message, 'error', 7000);
+              }
+              translateButton.disabled = false;
+              translateButton.textContent = label;
+            },
+          },
+          'Перевести на русский',
+        );
+        const settingsNow = (App.state && App.state.settings) || {};
+        if (fullText && !/[а-яё]/i.test(fullText)) {
+          body.append(UI.el('div', { class: 'row', style: { gap: '8px', alignItems: 'center' } }, translateButton, translatedNote));
+          if (settingsNow.translateDescriptions !== false) setTimeout(() => translateButton.click(), 80);
+        }
+
+        if ((project.files || []).length) {
+          const list = UI.el('div', { class: 'card', style: { padding: '10px 12px' } });
+          list.append(UI.el('div', { class: 'small muted', style: { marginBottom: '6px' }, text: 'Последние файлы' }));
+          for (const file of project.files.slice(0, 5)) {
+            const size = file.size ? `${Math.round(file.size / 1024 / 1024)} МБ` : '';
+            list.append(
+              UI.el(
+                'div',
+                { class: 'row', style: { gap: '8px', fontSize: '12px', justifyContent: 'space-between' } },
+                UI.el('span', { style: { overflow: 'hidden', textOverflow: 'ellipsis' }, text: file.name }),
+                UI.el('span', { class: 'muted', text: [file.date ? UI.date(file.date) : '', size].filter(Boolean).join(' • ') }),
+              ),
+            );
+          }
+          body.append(list);
+        }
+
+        const foot = UI.el('div', { class: 'modal-foot' });
+        foot.append(
+          UI.el('button', {
+            class: 'btn ghost',
+            onclick: () => window.api.openExternal(project.url || `https://www.curseforge.com/minecraft/search?search=${encodeURIComponent(project.title || '')}`),
+          }, UI.icon('image'), 'Открыть на CurseForge'),
+        );
+        const actionBtn = UI.el('button', { class: 'btn primary' }, UI.icon('download'), labels.add);
+        actionBtn.addEventListener('click', async () => {
+          const before = actionBtn.disabled;
+          if (before) return;
+          await quickInstall(item, actionBtn);
+        });
+        foot.append(actionBtn);
+        body.append(foot);
+      } catch (error) {
+        UI.clear(body);
+        body.append(
+          UI.el('div', { class: 'notice' }, UI.icon('alert'), UI.el('span', {}, error.message || 'Не удалось загрузить проект')),
+        );
+      }
+    })();
+  }
+
   function openProject(projectId) {
     const body = UI.el('div', { class: 'stack' }, UI.el('div', { class: 'skeleton', style: { minHeight: '160px' } }));
     const modal = UI.modal({
@@ -454,7 +601,7 @@ window.Views.contentView = (config) => {
         const instance = needsInstance ? currentInstance() : null;
         const project = await UI.req(window.api.content.project(projectId));
         const versions = await UI.req(
-          window.api.content.versions(project.id, instance ? instance.mcVersion : null, instance && config.type === 'mod' ? instance.loader.type : null),
+          window.api.content.versions(project.id, instance ? instance.mcVersion : null, instance && config.type === 'mod' ? (instance.loader || {}).type || null : null),
         );
 
         UI.clear(body);
@@ -677,7 +824,7 @@ window.Views.contentView = (config) => {
           select.append(
             UI.el('option', {
               value: item.id,
-              text: `${item.name} • ${item.mcVersion}${item.loader.type !== 'vanilla' ? ` ${item.loader.type}` : ''}`,
+              text: `${item.name} • ${item.mcVersion}${(item.loader || {}).type && item.loader.type !== 'vanilla' ? ` ${item.loader.type}` : ''}`,
             }),
           );
         }
