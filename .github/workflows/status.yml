@@ -28,7 +28,7 @@ jobs:
         run: |
           set -uo pipefail
 
-          SITE_CODE=$(curl -sS -o /tmp/site.html -w '%{http_code}' --max-time 25 https://name-studio.github.io/kubik-launcher/ || echo 0)
+          SITE_CODE=$(curl -sSL -o /tmp/site.html -w '%{http_code}' --max-time 25 https://name-studio.github.io/kubik-launcher/ || echo 0)
           SITE_OK=false
           if [ "$SITE_CODE" = "200" ] && grep -qi "Kubik Launcher" /tmp/site.html; then SITE_OK=true; fi
 
@@ -43,7 +43,7 @@ jobs:
           if [ -n "$TAG" ] && [ -n "$SETUP" ] && [ -n "$SUMS" ]; then REL_OK=true; fi
 
           SUMS_CODE=0
-          if [ -n "$URL" ]; then SUMS_CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$URL" || echo 0); fi
+          if [ -n "$URL" ]; then SUMS_CODE=$(curl -sSL -o /dev/null -w '%{http_code}' --max-time 20 "$URL" || echo 0); fi
 
           STATE=ok
           if [ "$SITE_OK" != "true" ] || [ "$REL_OK" != "true" ] || [ "$SUMS_CODE" != "200" ]; then STATE=bad; fi
