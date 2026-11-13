@@ -12,32 +12,89 @@ jobs:
   announce:
     runs-on: ubuntu-latest
     steps:
+      - name: Собрать данные релиза
+        id: rel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EV_NAME: ${{ github.event_name }}
+          REL_NAME: ${{ github.event.release.name }}
+          REL_TAG: ${{ github.event.release.tag_name }}
+          REL_URL: ${{ github.event.release.html_url }}
+          REL_BODY: ${{ github.event.release.body }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "${EV_NAME}" = "release" ]; then
+            NAME="${REL_NAME:-$REL_TAG}"
+            TAG="$REL_TAG"
+            URL="$REL_URL"
+            BODY="$REL_BODY"
+          else
+            JSON=$(gh api "repos/${REPO}/releases/latest")
+            TAG=$(printf '%s' "$JSON" | jq -r '.tag_name')
+            NAME=$(printf '%s' "$JSON" | jq -r '.name // .tag_name')
+            URL=$(printf '%s' "$JSON" | jq -r '.html_url')
+            BODY=$(printf '%s' "$JSON" | jq -r '.body // ""')
+          fi
+          {
+            echo "name<<EOF"
+            printf '%s\n' "$NAME"
+            echo "EOF"
+            echo "tag<<EOF"
+            printf '%s\n' "$TAG"
+            echo "EOF"
+            echo "url<<EOF"
+            printf '%s\n' "$URL"
+            echo "EOF"
+            echo "body<<EOF"
+            printf '%s\n' "$BODY"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Проверить, есть ли что публиковать
+        id: check
+        run: |
+          if [ -z "${{ steps.rel.outputs.tag }}" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Нет данных релиза — пропускаю."
+            exit 0
+          fi
+          echo "present=true" >> "$GITHUB_OUTPUT"
+
       - name: Отправка релиза в #обновления
+        if: steps.check.outputs.present == 'true'
         env:
           TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           CHANNEL: '1570778932519899258'
+          NAME: ${{ steps.rel.outputs.name }}
+          TAG: ${{ steps.rel.outputs.tag }}
+          URL: ${{ steps.rel.outputs.url }}
+          BODY: ${{ steps.rel.outputs.body }}
         run: |
           set -euo pipefail
           if [ -z "${TOKEN}" ]; then
             echo "Секрет DISCORD_BOT_TOKEN не задан — пропускаю."
             exit 0
           fi
-          BODY=$(jq -n \
-            --arg name "${{ github.event.release.name }}" \
-            --arg tag "${{ github.event.release.tag_name }}" \
-            --arg url "${{ github.event.release.html_url }}" \
-            --arg notes "${{ github.event.release.body }}" \
+          BODY_JSON=$(jq -n \
+            --arg name "$NAME" \
+            --arg tag "$TAG" \
+            --arg url "$URL" \
+            --arg notes "${BODY:0:3400}" \
             '{
               embeds: [{
-                title: ($name // $tag),
+                title: $name,
                 url: $url,
                 color: 38400,
-                description: ($notes | .[0:3500]),
+                description: $notes,
                 footer: { text: ("Релиз " + $tag) }
               }]
             }')
-          curl -sS -X POST "https://discord.com/api/v10/channels/${CHANNEL}/messages" \
+          CODE=$(curl -sS -o /tmp/resp.json -w '%{http_code}' -X POST \
+            "https://discord.com/api/v10/channels/${CHANNEL}/messages" \
             -H "Authorization: Bot ${TOKEN}" \
             -H "Content-Type: application/json" \
             -H "User-Agent: KubikLauncher/1" \
-            -d "$BODY" -o /dev/null -w "discord: %{http_code}\n"
+            -d "$BODY_JSON")
+          echo "discord: $CODE"
+          if [ "$CODE" -ge 400 ]; then cat /tmp/resp.json; exit 1; fi
