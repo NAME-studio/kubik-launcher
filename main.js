@@ -40,6 +40,7 @@ const curseforge = require('./src/main/curseforge');
 const packfile = require('./src/main/packfile');
 const friends = require('./src/main/friends');
 const rpc = require('./src/main/rpc');
+const cloud = require('./src/main/cloud');
 const updater = require('./src/main/updater');
 const skinhub = require('./src/main/skinhub');
 const { ensureDir, exists, formatBytes } = require('./src/main/util');
@@ -932,6 +933,19 @@ function registerIpc() {
   );
 }
 
+function countInstall() {
+  if (store.getSettings().installCounted) return;
+  setTimeout(() => {
+    cloud
+      .bumpInstalls()
+      .then((total) => {
+        store.saveSettings({ installCounted: true });
+        if (process.env.KUBIK_CLOUD_DEBUG) console.log('[stats] installs', total);
+      })
+      .catch(() => {});
+  }, 5000);
+}
+
 app.whenReady().then(() => {
   markTiming('ready');
   migrateLegacyLayout();
@@ -945,6 +959,7 @@ app.whenReady().then(() => {
   }
   initRoot();
   markTiming('root');
+  countInstall();
   registerIpc();
   createWindow();
   markTiming('window-created');

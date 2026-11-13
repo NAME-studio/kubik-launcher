@@ -4,6 +4,8 @@
 
 ![Главная](docs/screenshots/home.jpg)
 
+![Установок](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2FNAME-studio%2Fkubik-launcher%2Fmain%2Fdocs%2Fstats.json&query=%24.installs&label=%D1%83%D1%81%D1%82%D0%B0%D0%BD%D0%BE%D0%B2%D0%BE%D0%BA&color=3b82f6)
+
 ## Скачать
 
 - Сайт: https://name-studio.github.io/kubik-launcher/

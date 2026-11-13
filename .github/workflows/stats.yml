@@ -1,0 +1,64 @@
+name: Stats
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stats
+  cancel-in-progress: true
+
+jobs:
+  installs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: creds
+        env:
+          SA: ${{ secrets.FIREBASE_SA }}
+        run: |
+          if [ -z "$SA" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Секрет FIREBASE_SA не задан — счётчик не обновляю."
+            exit 0
+          fi
+          echo "present=true" >> "$GITHUB_OUTPUT"
+
+      - id: auth
+        if: steps.creds.outputs.present == 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SA }}
+          token_format: access_token
+
+      - if: steps.creds.outputs.present == 'true'
+        env:
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+          PROJECT: kubik-launcher
+        run: |
+          set -euo pipefail
+          URL="https://firestore.googleapis.com/v1/projects/$PROJECT/databases/(default)/documents/stats/installs"
+          BODY=$(curl -sS -f -H "Authorization: Bearer $TOKEN" "$URL")
+          TOTAL=$(printf '%s' "$BODY" | jq -r '.fields.total.integerValue // "0"')
+          case "$TOTAL" in
+            ''|*[!0-9]*) echo "Странное значение счётчика: $TOTAL"; exit 1 ;;
+          esac
+          printf '{\n  "installs": %s,\n  "updated": "%s"\n}\n' "$TOTAL" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > docs/stats.json
+          echo "Установок: $TOTAL"
+
+      - if: steps.creds.outputs.present == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- docs/stats.json; then
+            echo "Число не изменилось — коммит не нужен."
+            exit 0
+          fi
+          git add docs/stats.json
+          git commit -m "Обновление счётчика установок"
+          git push

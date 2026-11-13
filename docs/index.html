@@ -810,7 +810,7 @@
         </defs>
       </svg>
       Kubik Launcher
-      <small data-version>1.2.0</small>
+      <small data-version>1.2.1</small>
     </a>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav">Меню</button>
     <nav class="nav" id="nav" aria-label="Основная навигация">
@@ -830,7 +830,7 @@
   <section class="hero">
     <div class="wrap">
       <div class="hero-copy">
-        <p class="eyebrow"><b data-version>1.2.0</b> Windows 10/11 · бесплатно · MIT</p>
+        <p class="eyebrow"><b data-version>1.2.1</b> Windows 10/11 · бесплатно · MIT</p>
         <h1>Майнкрафт запускается <em>за пару секунд</em></h1>
         <p class="lead">
           Kubik Launcher проверяет файлы игры один раз, кэширует Java и больше не пересчитывает хеши
@@ -841,7 +841,7 @@
           <a class="btn primary" data-download="setup" href="https://github.com/NAME-studio/kubik-launcher/releases/latest">
             Скачать установщик
           </a>
-          <a class="btn" data-download="portable" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.0/KubikLauncher-1.2.0-portable.zip">
+          <a class="btn" data-download="portable" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.0/KubikLauncher-1.2.1-portable.zip">
             Портативная версия
           </a>
         </div>
@@ -850,6 +850,7 @@
           <span>Установщик 105 МБ</span>
           <span>Русский интерфейс</span>
           <span>Скины Ely.by</span>
+          <span data-installs-block hidden>Установок: <b data-installs>—</b></span>
         </div>
       </div>
 
@@ -1053,8 +1054,8 @@
           <strong>Windows показывает предупреждение?</strong> Установщик пока не подписан сертификатом, поэтому SmartScreen
           может написать «Windows защитила ваш компьютер». Нажмите «Подробнее» → «Выполнить в любом случае»
           или сверьте контрольную сумму с
-          <a data-download="sums" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.0/SHA256SUMS.txt">SHA256SUMS.txt</a>.
-          Проверить файл можно командой <code>certutil -hashfile KubikLauncher-Setup-<span data-version>1.2.0</span>.exe SHA256</code>.
+          <a data-download="sums" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.1/SHA256SUMS.txt">SHA256SUMS.txt</a>.
+          Проверить файл можно командой <code>certutil -hashfile KubikLauncher-Setup-<span data-version>1.2.1</span>.exe SHA256</code>.
           Установщик проверен в
           <a href="https://www.virustotal.com/gui/file/6c558ae8cf7a91a3c87ed9be9a5b291d316632918f46e3c5e6e52319afec948f">VirusTotal</a>
           (версия 1.1.9).
@@ -1073,6 +1074,17 @@
       </div>
 
       <div class="timeline">
+        <article class="release">
+          <div>
+            <div class="ver">1.2.1</div>
+            <span class="date">ноябрь 2026</span>
+          </div>
+          <ul>
+            <li>Счётчик установок: лаунчер один раз сообщает «плюс один» — без id устройства, IP и истории действий; число видно на сайте.</li>
+            <li>Добавление друга по прежнему длинному id: если шестизначный код не подошёл, лаунчер найдёт друга сам.</li>
+            <li>Понятная подсказка вместо «Такой код не найден» — код регистрируется при первом запуске версии 1.2.0 или новее.</li>
+          </ul>
+        </article>
         <article class="release">
           <div>
             <div class="ver">1.2.0</div>
@@ -1247,7 +1259,7 @@
       <h4>Ссылки</h4>
       <a href="https://github.com/NAME-studio/kubik-launcher">Исходники</a>
       <a href="https://github.com/NAME-studio/kubik-launcher/releases">Релизы</a>
-      <a data-download="sums" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.0/SHA256SUMS.txt">Контрольные суммы</a>
+      <a data-download="sums" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.1/SHA256SUMS.txt">Контрольные суммы</a>
       <a href="https://github.com/NAME-studio/kubik-launcher/issues/new?template=bug_report.yml">Сообщить о баге</a>
       <a href="privacy.html">Конфиденциальность</a>
       <a href="#top">Наверх</a>
@@ -1285,7 +1297,7 @@
 
   (function () {
     var REPO = 'NAME-studio/kubik-launcher';
-    var FALLBACK_VERSION = '1.2.0';
+    var FALLBACK_VERSION = '1.2.1';
 
     var setVersion = function (version) {
       if (!version) return;
@@ -1302,6 +1314,22 @@
     };
 
     setVersion(FALLBACK_VERSION);
+
+    fetch('stats.json', { cache: 'no-store' })
+      .then(function (response) {
+        return response.ok ? response.json() : null;
+      })
+      .then(function (stats) {
+        var total = stats && Number(stats.installs);
+        if (!total) return;
+        document.querySelectorAll('[data-installs]').forEach(function (node) {
+          node.textContent = total.toLocaleString('ru-RU');
+        });
+        document.querySelectorAll('[data-installs-block]').forEach(function (node) {
+          node.hidden = false;
+        });
+      })
+      .catch(function () {});
 
     fetch('https://api.github.com/repos/' + REPO + '/releases/latest', {
       headers: { Accept: 'application/vnd.github+json' },

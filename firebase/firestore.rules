@@ -9,6 +9,7 @@ rules_version = '2';
 //   codes/{code}— справочник «код друга → uid»: читать может любой вошедший, писать только владелец.
 //   packs/{id}  — видят и получают только участники (массив members, автор всегда в нём);
 //                 менять содержимое — автор, участник может только выйти из сборки.
+//   stats/installs — счётчик установок: любой может увеличить на 1, читать нельзя.
 //   всё прочее — закрыто.
 //
 // Временно:
@@ -87,6 +88,17 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'updated']);
 
       allow delete: if signedIn() && resource.data.creatorUid == request.auth.uid;
+    }
+
+    // Счётчик установок: анонимный (одно число, без данных о человеке).
+    // Клиент умеет только увеличить число; прочитать счётчик из лаунчера нельзя —
+    // значение забирает служебный GitHub Action с сервисным аккаунтом.
+    match /stats/installs {
+      allow get, list: if false;
+      allow create: if request.resource.data.keys().hasOnly(['total', 'updated'])
+        && request.resource.data.total == 1;
+      allow update: if request.resource.data.keys().hasOnly(['total', 'updated']);
+      allow delete: if false;
     }
 
     match /{document=**} {

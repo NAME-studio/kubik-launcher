@@ -240,9 +240,14 @@ async function addFriend(rawCode) {
   if (code === myCode()) throw new Error('Это ваш собственный код');
 
   const entry = await cloud.getDoc('codes', code).catch(() => null);
-  const targetId = entry && entry.uid;
+  let targetId = entry && entry.uid;
+  if (!targetId && code.length > 8) {
+    // Друг на старой версии мог назвать свой прежний id вместо кода — он длиннее 8 символов.
+    const byId = await cloud.getDoc('users', code.toLowerCase()).catch(() => null);
+    if (byId) targetId = byId.uid || byId.id;
+  }
   if (!targetId) {
-    throw new Error('Такой код не найден. Друг должен запустить лаунчер и открыть «Друзья»');
+    throw new Error('Код не найден. Попросите друга установить версию 1.2.0 или новее и запустить лаунчер — код регистрируется при первом запуске.');
   }
   if (targetId === myId()) throw new Error('Это ваш собственный код');
 

@@ -333,4 +333,29 @@ async function removeDoc(collection, id) {
   }
 }
 
-module.exports = { ready, config, getDoc, batchGet, setDoc, patchDoc, createDoc, query, removeDoc, blockedSeconds };
+async function bumpInstalls() {
+  const { projectId } = config();
+  const document = `projects/${projectId}/databases/(default)/documents/stats/installs`;
+  const result = await request(':commit', {
+    method: 'POST',
+    body: {
+      writes: [
+        {
+          transform: {
+            document,
+            fieldTransforms: [
+              { fieldPath: 'total', increment: { integerValue: '1' } },
+              { fieldPath: 'updated', setToServerValue: 'REQUEST_TIME' },
+            ],
+          },
+        },
+      ],
+    },
+  });
+  const rows = (result && result.writeResults) || [];
+  const values = (rows[0] && rows[0].transformResults) || [];
+  const total = values[0] && Number(values[0].integerValue || values[0].doubleValue);
+  return Number.isFinite(total) ? total : null;
+}
+
+module.exports = { ready, config, getDoc, batchGet, setDoc, patchDoc, createDoc, query, removeDoc, bumpInstalls, blockedSeconds };
