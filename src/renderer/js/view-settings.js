@@ -8,6 +8,7 @@ window.Views.settings = (() => {
   const SITE_URL = 'https://name-studio.github.io/kubik-launcher/';
   const GITHUB_URL = 'https://github.com/NAME-studio/kubik-launcher';
   const BUGS_URL = `${GITHUB_URL}/issues/new?template=bug_report.yml`;
+  const DISCORD_URL = 'https://discord.gg/VCemrH6M44';
 
   async function save(patch) {
     try {
@@ -51,6 +52,7 @@ window.Views.settings = (() => {
         { class: 'row', style: { gap: '8px', flexWrap: 'wrap', marginTop: '10px' } },
         UI.el('button', { class: 'btn sm', onclick: () => window.api.openExternal(SITE_URL) }, 'Сайт'),
         UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(GITHUB_URL) }, 'GitHub'),
+        UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(DISCORD_URL) }, 'Discord'),
         UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(BUGS_URL) }, 'Сообщить о баге'),
         UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openPath(info.configDir || info.root) }, UI.icon('folder'), 'Логи и конфиг'),
       ),
@@ -661,6 +663,7 @@ window.Views.settings = (() => {
           { class: 'row', style: { marginTop: '12px', gap: '8px', flexWrap: 'wrap' } },
           UI.el('button', { class: 'btn sm', onclick: openAbout }, UI.icon('info'), 'О лаунчере'),
           UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(BUGS_URL) }, 'Сообщить о баге'),
+          UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(DISCORD_URL) }, 'Discord'),
           UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal('https://modrinth.com') }, 'Modrinth'),
           UI.el('button', { class: 'btn sm', onclick: () => window.api.openExternal('https://ely.by') }, 'Ely.by'),
           UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal('https://docs.ely.by/ru/minecraft-auth.html') }, 'Документация Ely.by'),

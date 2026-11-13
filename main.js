@@ -793,9 +793,9 @@ function registerIpc() {
         }
       }
     }
-    const removed = instances.deleteInstances(list, true);
-    if (removed.length) forgetLastInstance(removed);
-    return removed;
+    const result = instances.deleteInstances(list, true);
+    if (result.removed.length) forgetLastInstance(result.removed);
+    return result;
   }));
 
   ipcMain.handle('servers:list', wrap(() => store.getSettings().servers || []));

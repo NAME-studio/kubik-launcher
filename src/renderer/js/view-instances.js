@@ -81,13 +81,14 @@ window.Views.instances = (() => {
       selected.append(UI.el('span', { class: 'badge accent', text: `Minecraft ${data.mcVersion}` }));
     }
 
+    let shownVersions = 120;
+
     function renderVersions() {
       const query = searchInput.value.trim().toLowerCase();
-      const filtered = versions
-        .filter((v) => !query || v.id.toLowerCase().includes(query) || v.type.includes(query))
-        .slice(0, 120);
+      const filtered = versions.filter((v) => !query || v.id.toLowerCase().includes(query) || v.type.includes(query));
+      const visible = filtered.slice(0, shownVersions);
       UI.clear(list);
-      for (const version of filtered) {
+      for (const version of visible) {
         const row = UI.el(
           'div',
           { class: `vp-row${version.id === data.mcVersion ? ' active' : ''}` },
@@ -103,6 +104,22 @@ window.Views.instances = (() => {
           loadLoaderVersions();
         });
         list.append(row);
+      }
+      if (filtered.length > shownVersions) {
+        list.append(
+          UI.el(
+            'button',
+            {
+              class: 'btn sm',
+              style: { margin: '10px auto 2px', display: 'block' },
+              onclick: () => {
+                shownVersions += 120;
+                renderVersions();
+              },
+            },
+            `Показать ещё (${filtered.length - shownVersions})`,
+          ),
+        );
       }
       if (!filtered.length) list.append(UI.el('div', { class: 'vp-row muted', text: 'Ничего не найдено' }));
     }
@@ -206,7 +223,13 @@ window.Views.instances = (() => {
     renderSelected();
     renderLoaders();
     renderCovers();
-    searchInput.addEventListener('input', UI.debounce(renderVersions, 160));
+    searchInput.addEventListener(
+      'input',
+      UI.debounce(() => {
+        shownVersions = 120;
+        renderVersions();
+      }, 160),
+    );
     loadLoaderVersions();
 
     const modal = UI.modal({
@@ -572,12 +595,17 @@ window.Views.instances = (() => {
     );
     if (!confirmed) return;
     try {
-      const removed = await UI.req(window.api.instances.removeMany([...picked]));
-      selecting = false;
-      picked.clear();
-      await App.reloadInstances();
-      UI.toast(`Удалено сборок: ${removed.length}`, 'success');
-      App.refresh();
+        const result = await UI.req(window.api.instances.removeMany([...picked]));
+        selecting = false;
+        picked.clear();
+        await App.reloadInstances();
+        const failed = (result && result.failed) || [];
+        if (failed.length) {
+          UI.toast(`Удалено: ${result.removed.length}. Не удалось: ${failed.length} — ${failed[0].reason}`, 'error');
+        } else {
+          UI.toast(`Удалено сборок: ${result.removed.length}`, 'success');
+        }
+        App.refresh();
     } catch (error) {
       UI.toast(error.message, 'error');
     }

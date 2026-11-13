@@ -172,7 +172,17 @@ async function installContent(instanceId, projectId, options = {}) {
     const all = await getVersions(project.id, {});
     version = all.find((v) => v.id === options.versionId);
   }
-  if (!version) throw new Error(`Нет подходящей версии для Minecraft ${instance.mcVersion}`);
+  if (!version) {
+    const all = await getVersions(project.id, {}).catch(() => []);
+    const games = [...new Set(all.flatMap((v) => v.gameVersions || []))];
+    const loaders = [...new Set(all.flatMap((v) => v.loaders || []))];
+    const where = games.length
+      ? ` Мод есть для Minecraft ${games.slice(0, 4).join(', ')}${loaders.length ? ` (${loaders.join(', ')})` : ''}. Создайте сборку с этой версией.`
+      : '';
+    throw new Error(
+      `Нет версии «${project.title}» для Minecraft ${instance.mcVersion}${loader ? ` ${loader}` : ''}.${where}`,
+    );
+  }
 
   const file = version.files.find((f) => f.primary) || version.files[0];
   if (!file) throw new Error('У версии нет файлов');

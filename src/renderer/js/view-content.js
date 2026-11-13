@@ -144,6 +144,29 @@ window.Views.contentView = (config) => {
     return UI.el('div', { class: 'mod-icon placeholder' }, UI.icon(config.type === 'datapack' ? 'map' : 'puzzle'));
   }
 
+  const installQueue = [];
+  const INSTALL_PARALLEL = 3;
+  let installsActive = 0;
+
+  function pumpInstalls() {
+    while (installsActive < INSTALL_PARALLEL && installQueue.length) {
+      const job = installQueue.shift();
+      installsActive += 1;
+      Promise.resolve()
+        .then(job)
+        .catch(() => {})
+        .then(() => {
+          installsActive -= 1;
+          pumpInstalls();
+        });
+    }
+  }
+
+  function queueInstall(job) {
+    installQueue.push(job);
+    pumpInstalls();
+  }
+
   async function quickInstall(item, button) {
     if (!App.requireAccount('Создайте аккаунт, чтобы скачивать — это бесплатно')) return;
     if (item.source === 'curse') {
@@ -218,19 +241,23 @@ window.Views.contentView = (config) => {
       UI.toast('В сборке нет загрузчика модов — мод не загрузится в игре', 'info', 7000);
     }
     button.disabled = true;
-    button.textContent = 'Скачиваю…';
-    try {
-      await UI.req(window.api.content.install(instance.id, item.id));
-      s.installedIds.add(item.id);
-      UI.toast(`${item.title} установлен`, 'success');
-      button.textContent = 'Установлено';
-      button.classList.add('done');
-      refreshInstalled();
-    } catch (error) {
-      UI.toast(error.message, 'error', 7000);
-      button.disabled = false;
-      button.textContent = 'Скачать';
-    }
+    button.textContent = 'В очереди…';
+    const targetId = instance.id;
+    queueInstall(async () => {
+      button.textContent = 'Скачиваю…';
+      try {
+        await UI.req(window.api.content.install(targetId, item.id));
+        s.installedIds.add(item.id);
+        UI.toast(`${item.title} установлен`, 'success');
+        button.textContent = 'Установлено';
+        button.classList.add('done');
+        refreshInstalled();
+      } catch (error) {
+        UI.toast(error.message, 'error', 7000);
+        button.disabled = false;
+        button.textContent = 'Скачать';
+      }
+    });
   }
 
   function modCard(item) {

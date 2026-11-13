@@ -112,23 +112,32 @@ function deleteInstance(id, keepFiles = true) {
   if (keepFiles) {
     const target = paths.join('trash', `${id}-${Date.now()}`);
     ensureDir(paths.join('trash'));
-    fs.renameSync(dir, target);
+    try {
+      fs.renameSync(dir, target);
+    } catch (error) {
+      // Папку держит игра или антивирус: пробуем удалить на месте, иначе сообщаем причину.
+      unlinkQuiet(dir);
+      if (exists(dir)) throw error;
+    }
   } else {
     unlinkQuiet(dir);
+    if (exists(dir)) throw new Error('Не удалось удалить файлы сборки');
   }
   return true;
 }
 
 function deleteInstances(ids, keepFiles = true) {
   const removed = [];
+  const failed = [];
   for (const id of Array.isArray(ids) ? ids : []) {
     try {
       if (deleteInstance(id, keepFiles)) removed.push(id);
-    } catch {
-      /* пропускаем неудачные */
+      else failed.push({ id, reason: 'Папка сборки не найдена' });
+    } catch (error) {
+      failed.push({ id, reason: (error && error.message) || String(error) });
     }
   }
-  return removed;
+  return { removed, failed };
 }
 
 function duplicateInstance(id) {

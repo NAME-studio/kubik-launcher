@@ -10,6 +10,7 @@
 
 - Сайт: https://name-studio.github.io/kubik-launcher/
 - Релизы: https://github.com/NAME-studio/kubik-launcher/releases
+- Discord: https://discord.gg/VCemrH6M44
 
 | Файл | Для чего |
 | --- | --- |
