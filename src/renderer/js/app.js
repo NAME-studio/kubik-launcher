@@ -1028,8 +1028,12 @@
       window.Effects.bindClicks();
     }
     try {
-      App.state.info = await UI.req(window.api.info());
-      const data = await UI.req(window.api.settings.get());
+      const [info, data, instancesList] = await Promise.all([
+        UI.req(window.api.info()),
+        UI.req(window.api.settings.get()),
+        UI.req(window.api.instances.list()),
+      ]);
+      App.state.info = info;
       App.state.settings = data.settings;
       if (window.Effects) {
         window.Effects.setSoundEnabled(data.settings.sounds !== false);
@@ -1038,19 +1042,21 @@
       }
       App.state.accounts = { current: data.accounts.current, list: data.accounts.list || [] };
       App.state.currentAccount = (data.accounts.list || []).find((a) => a.id === data.accounts.current) || null;
-      App.state.instances = await UI.req(window.api.instances.list());
+      App.state.instances = Array.isArray(instancesList) ? instancesList : [];
       const wantedInstance = App.state.settings.lastInstance;
       const instanceExists = Boolean(wantedInstance) && App.state.instances.some((item) => item.id === wantedInstance);
       App.state.selectedInstanceId = instanceExists
         ? wantedInstance
         : (App.state.instances[0] && App.state.instances[0].id) || null;
-      UI.req(window.api.java.list())
-        .then((list) => {
-          App.state.javaList = list || [];
-        })
-        .catch(() => {
-          App.state.javaList = App.state.javaList || [];
-        });
+      setTimeout(() => {
+        UI.req(window.api.java.list())
+          .then((list) => {
+            App.state.javaList = list || [];
+          })
+          .catch(() => {
+            App.state.javaList = App.state.javaList || [];
+          });
+      }, 400);
       document.getElementById('tb-version').textContent = `v${App.state.info.version}`;
       updateStatus();
       document.title = 'Kubik Launcher';

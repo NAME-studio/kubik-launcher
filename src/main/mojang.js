@@ -47,23 +47,34 @@ async function getManifest(force = false) {
       return null;
     }
   };
-  if (!force && exists(cacheFile)) {
+
+  const cacheAge = () => {
     try {
-      if (Date.now() - fs.statSync(cacheFile).mtimeMs < 10 * 60 * 1000) {
-        const cached = readCache();
-        if (cached) return cached;
-      }
+      return Date.now() - fs.statSync(cacheFile).mtimeMs;
     } catch {
-      /* ignore */
+      return Infinity;
     }
-  }
-  try {
+  };
+
+  const refresh = async () => {
     const manifest = await net.fetchJson(MANIFEST_URL, { timeout: exists(cacheFile) ? 12000 : 30000 });
     ensureDir(paths.cache());
     fs.writeFileSync(cacheFile, JSON.stringify(manifest));
     manifestCache = manifest;
     manifestTime = Date.now();
     return manifest;
+  };
+
+  if (!force && exists(cacheFile)) {
+    const cached = readCache();
+    if (cached) {
+      if (cacheAge() > 10 * 60 * 1000) refresh().catch(() => {});
+      return cached;
+    }
+  }
+
+  try {
+    return await refresh();
   } catch (error) {
     const cached = readCache();
     if (cached) return cached;
