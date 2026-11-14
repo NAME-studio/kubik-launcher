@@ -855,6 +855,8 @@ function registerIpc() {
     return result;
   }));
 
+  ipcMain.handle('instances:restore-trash', wrap(() => ({ restored: instances.restoreFromTrash() })));
+
   ipcMain.handle('servers:list', wrap(() => store.getSettings().servers || []));
   ipcMain.handle(
     'servers:save',

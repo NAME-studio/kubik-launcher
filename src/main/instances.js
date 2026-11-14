@@ -140,6 +140,28 @@ function deleteInstances(ids, keepFiles = true) {
   return { removed, failed };
 }
 
+function restoreFromTrash() {
+  const trashDir = paths.join('trash');
+  if (!exists(trashDir)) return [];
+  const restored = [];
+  for (const entry of fs.readdirSync(trashDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const source = path.join(trashDir, entry.name);
+    if (!exists(path.join(source, 'instance.json'))) continue;
+    const base = entry.name.replace(/-\d{10,}$/, '');
+    const target = paths.instanceDir(base);
+    if (exists(target)) continue;
+    try {
+      fs.renameSync(source, target);
+      const instance = readInstance(base);
+      if (instance) restored.push({ id: base, name: instance.name });
+    } catch {
+      /* папку держит игра или антивирус — оставляем в корзине */
+    }
+  }
+  return restored;
+}
+
 function duplicateInstance(id) {
   const source = readInstance(id);
   if (!source) throw new Error('Сборка не найдена');
@@ -514,6 +536,7 @@ module.exports = {
   updateInstance,
   deleteInstance,
   deleteInstances,
+  restoreFromTrash,
   duplicateInstance,
   ensureProfile,
   loaderVersions,

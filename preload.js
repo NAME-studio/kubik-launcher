@@ -66,6 +66,7 @@ contextBridge.exposeInMainWorld('api', {
     update: (id, patch) => invoke('instances:update', { id, patch }),
     remove: (id) => invoke('instances:delete', { id }),
     removeMany: (ids) => invoke('instances:delete-many', { ids }),
+    restoreTrash: () => invoke('instances:restore-trash'),
     duplicate: (id) => invoke('instances:duplicate', { id }),
     size: (id) => invoke('instances:size', { id }),
     openFolder: (id) => invoke('instances:open-folder', { id }),
