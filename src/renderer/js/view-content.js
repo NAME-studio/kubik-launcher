@@ -4,11 +4,11 @@ window.Views = window.Views || {};
 
 window.Views.contentView = (config) => {
   const labels = {
-    mod: { one: 'мод', many: 'Моды', add: 'Скачать мод', placeholder: 'Поиск модов: sodium, create, jei…' },
-    modpack: { one: 'модпак', many: 'Модпаки', add: 'Скачать модпак', placeholder: 'Поиск модпаков: better mc, rlcraft…' },
-    resourcepack: { one: 'ресурспак', many: 'Ресурспаки', add: 'Скачать ресурспак', placeholder: 'Поиск ресурспаков: faithful, bare bones…' },
-    shader: { one: 'шейдер', many: 'Шейдеры', add: 'Скачать шейдер', placeholder: 'Поиск шейдеров: complementary, bsl…' },
-    datapack: { one: 'карта', many: 'Карты и миры', add: 'Скачать карту', placeholder: 'Поиск миров: dungeons, towns, terralith…' },
+    mod: { one: 'мод', many: 'Моды', gen: 'модов', add: 'Скачать мод', placeholder: 'Поиск модов: sodium, create, jei…' },
+    modpack: { one: 'модпак', many: 'Модпаки', gen: 'модпаков', add: 'Скачать модпак', placeholder: 'Поиск модпаков: better mc, rlcraft…' },
+    resourcepack: { one: 'ресурспак', many: 'Ресурспаки', gen: 'ресурспаков', add: 'Скачать ресурспак', placeholder: 'Поиск ресурспаков: faithful, bare bones…' },
+    shader: { one: 'шейдер', many: 'Шейдеры', gen: 'шейдеров', add: 'Скачать шейдер', placeholder: 'Поиск шейдеров: complementary, bsl…' },
+    datapack: { one: 'карта', many: 'Карты и миры', gen: 'карт', add: 'Скачать карту', placeholder: 'Поиск миров: dungeons, towns, terralith…' },
   }[config.type];
 
   const needsInstance = config.type !== 'modpack';
@@ -26,6 +26,12 @@ window.Views.contentView = (config) => {
     noInstance: false,
     anyVersion: true,
     installed: null,
+    installedQuery: '',
+    updates: null,
+    updatesLoading: false,
+    updating: false,
+    installState: {},
+    installNodes: new Map(),
     installedIds: new Set(),
     observer: null,
     curseHasKey: null,
@@ -133,6 +139,9 @@ window.Views.contentView = (config) => {
       const data = await UI.req(window.api.content.installed(instance.id));
       s.installed = data;
       for (const item of data.items || []) s.installedIds.add(item.projectId);
+      if (config.type === 'resourcepack') {
+        s.packOrder = await UI.req(window.api.packs.list(instance.id)).catch(() => []);
+      }
     } catch {
       s.installed = { items: [], manual: [] };
     }
@@ -421,6 +430,34 @@ window.Views.contentView = (config) => {
     }
   }
 
+  const isPackView = config.type === 'resourcepack';
+
+  function packName(filename) {
+    return `file/${String(filename || '').replace(/\\/g, '/')}`;
+  }
+
+  function packActive(filename) {
+    return (s.packOrder || []).includes(packName(filename));
+  }
+
+  function packSwitch(filename) {
+    const active = packActive(filename);
+    return UI.el('div', {
+      class: `switch${active ? ' on' : ''}`,
+      title: active ? 'Отключить в игре' : 'Включить в игре',
+      onclick: async (event) => {
+        event.stopPropagation();
+        try {
+          const res = await UI.req(window.api.packs.toggle(currentInstance().id, filename));
+          s.packOrder = res.list || [];
+          await refreshInstalled();
+        } catch (error) {
+          UI.toast(error.message, 'error');
+        }
+      },
+    });
+  }
+
   function renderInstalled() {
     const host = document.getElementById('content-installed');
     if (!host) return;
@@ -454,30 +491,184 @@ window.Views.contentView = (config) => {
       return;
     }
 
+    const rows = [];
+    const enabledCount = items.filter((item) => item.enabled).length + manual.filter((file) => !file.disabled).length;
+
+    const searchInput = UI.el('input', {
+      class: 'input',
+      type: 'search',
+      placeholder: `Поиск среди ${labels.gen}…`,
+      value: s.installedQuery || '',
+    });
+    searchInput.addEventListener('input', () => {
+      s.installedQuery = searchInput.value;
+      const q = searchInput.value.trim().toLowerCase();
+      for (const row of rows) {
+        row.el.style.display = !q || row.text.toLowerCase().includes(q) ? '' : 'none';
+      }
+    });
+
+    const updateButton = config.type === 'mod'
+      ? UI.el(
+          'button',
+          {
+            class: 'btn sm ghost',
+            disabled: s.updatesLoading || s.updating,
+            onclick: async () => {
+              s.updatesLoading = true;
+              renderInstalled();
+              try {
+                const list = await UI.req(window.api.content.updates(currentInstance().id));
+                s.updates = Array.isArray(list) ? list : [];
+                UI.toast(
+                  s.updates.length ? `Доступно обновлений: ${s.updates.length}` : 'Все моды актуальны',
+                  s.updates.length ? 'info' : 'success',
+                );
+              } catch (error) {
+                UI.toast(error.message, 'error');
+              } finally {
+                s.updatesLoading = false;
+                renderInstalled();
+              }
+            },
+          },
+          UI.icon('refresh'),
+          s.updatesLoading ? 'Проверяю…' : 'Проверить обновления',
+        )
+      : null;
+
+    const updateAllButton = config.type === 'mod' && s.updates && s.updates.length
+      ? UI.el(
+          'button',
+          {
+            class: 'btn sm',
+            disabled: s.updating,
+            onclick: async () => {
+              s.updating = true;
+              renderInstalled();
+              try {
+                const result = await UI.req(window.api.content.updateAll(currentInstance().id));
+                const ok = (result || []).filter((r) => r.ok).length;
+                const failed = (result || []).filter((r) => !r.ok);
+                UI.toast(
+                  failed.length ? `Обновлено ${ok}, с ошибкой ${failed.length}` : `Обновлено: ${ok}`,
+                  failed.length ? 'error' : 'success',
+                  7000,
+                );
+                s.updates = null;
+              } catch (error) {
+                UI.toast(error.message, 'error');
+              } finally {
+                s.updating = false;
+                await refreshInstalled();
+              }
+            },
+          },
+          UI.icon('download'),
+          s.updating ? 'Обновляю…' : `Обновить всё (${s.updates.length})`,
+        )
+      : null;
+
+    const bar = UI.el(
+      'div',
+      { style: { display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '10px' } },
+      searchInput,
+      UI.el('div', {
+        class: 'tiny muted',
+        text: `включено ${enabledCount} из ${items.length + manual.length}`,
+      }),
+      updateButton,
+      updateAllButton,
+    );
+
     const list = UI.el('div', { class: 'list' });
     for (const item of items) {
-      const row = UI.el('div', { class: `installed-row${item.enabled ? '' : ' off'}` });
-      row.append(
+      const update = !isPackView && s.updates ? s.updates.find((entry) => entry.projectId === item.projectId) : null;
+      const row = UI.el('div', { class: `installed-row${(isPackView ? packActive(item.filename) : item.enabled) ? '' : ' off'}` });
+      row.append(...[
         item.icon ? UI.el('img', { class: 'mod-icon', style: { width: '38px', height: '38px' }, src: item.icon, loading: 'lazy' }) : iconPlaceholder(),
         UI.el(
           'div',
           { class: 'grow' },
           UI.el('div', { style: { fontWeight: '600' } }, item.title),
-          UI.el('div', { class: 'tiny muted', text: `${item.versionNumber || ''} • ${item.sizeLabel} ${item.fromModpack ? '• из модпака' : ''}` }),
+          UI.el('div', {
+            class: 'tiny muted',
+            text: isPackView
+              ? [item.versionNumber || '', item.sizeLabel, packActive(item.filename) ? '' : 'выключен'].filter(Boolean).join(' • ')
+              : `${item.versionNumber || ''} • ${item.sizeLabel} ${item.fromModpack ? '• из модпака' : ''}`,
+          }),
         ),
-        UI.el('div', {
-          class: `switch${item.enabled ? ' on' : ''}`,
-          onclick: async (event) => {
-            event.stopPropagation();
-            try {
-              const res = await UI.req(window.api.content.toggle(currentInstance().id, item.projectId));
-              item.enabled = res.enabled;
-              await refreshInstalled();
-            } catch (error) {
-              UI.toast(error.message, 'error');
-            }
-          },
-        }),
+        isPackView
+          ? packSwitch(item.filename)
+          : UI.el('div', {
+              class: `switch${item.enabled ? ' on' : ''}`,
+              onclick: async (event) => {
+                event.stopPropagation();
+                try {
+                  const res = await UI.req(window.api.content.toggle(currentInstance().id, item.projectId));
+                  item.enabled = res.enabled;
+                  await refreshInstalled();
+                } catch (error) {
+                  UI.toast(error.message, 'error');
+                }
+              },
+            }),
+        (() => {
+          const state = s.installState[item.projectId];
+          if (state && state.busy) {
+            const label = `Скачиваю ${Math.round(state.percent || 0)}%`;
+            const button = UI.el(
+              'button',
+              { class: 'btn sm ghost update-badge busy', disabled: true, title: 'Идёт загрузка' },
+              UI.icon('download'),
+              label,
+            );
+            s.installNodes.set(item.projectId, button);
+            return button;
+          }
+          if (state && state.error) {
+            return UI.el(
+              'button',
+              {
+                class: 'btn sm ghost update-badge error',
+                title: state.error,
+                onclick: (event) => {
+                  event.stopPropagation();
+                  delete s.installState[item.projectId];
+                  renderInstalled();
+                },
+              },
+              UI.icon('alert'),
+              'Ошибка',
+            );
+          }
+          if (!update) return null;
+          return UI.el(
+            'button',
+            {
+              class: 'btn sm ghost update-badge',
+              title: `Обновить до ${update.latest}`,
+              onclick: async (event) => {
+                event.stopPropagation();
+                s.installState[item.projectId] = { busy: true, percent: 0 };
+                renderInstalled();
+                try {
+                  await UI.req(window.api.content.install(currentInstance().id, item.projectId, update.versionId));
+                  delete s.installState[item.projectId];
+                  s.updates = (s.updates || []).filter((entry) => entry.projectId !== item.projectId);
+                  UI.toast(`${item.title} обновлён до ${update.latest}`, 'success');
+                  await refreshInstalled();
+                } catch (error) {
+                  s.installState[item.projectId] = { busy: false, error: error.message };
+                  renderInstalled();
+                  UI.toast(error.message, 'error');
+                }
+              },
+            },
+            UI.icon('download'),
+            update.latest,
+          );
+        })(),
         UI.el('button', {
           class: 'btn sm ghost icon-only',
           title: 'Удалить',
@@ -492,38 +683,63 @@ window.Views.contentView = (config) => {
             }
           },
         }, UI.icon('trash')),
-      );
+      ].filter(Boolean));
+      rows.push({ el: row, text: `${item.title || ''} ${item.versionNumber || ''}` });
       list.append(row);
     }
 
     for (const file of manual) {
-      list.append(
+      const active = isPackView ? packActive(file.filename) : !file.disabled;
+      const row = UI.el(
+        'div',
+        { class: `installed-row${active ? '' : ' off'}` },
+        UI.el('div', { class: 'mod-icon placeholder', style: { width: '38px', height: '38px' } }, UI.icon('hard-drive')),
         UI.el(
           'div',
-          { class: `installed-row${file.disabled ? ' off' : ''}` },
-          UI.el('div', { class: 'mod-icon placeholder', style: { width: '38px', height: '38px' } }, UI.icon('hard-drive')),
-          UI.el(
-            'div',
-            { class: 'grow' },
-            UI.el('div', { style: { fontWeight: '600' } }, file.filename),
-            UI.el('div', { class: 'tiny muted', text: `добавлено вручную • ${UI.bytes(file.size)}` }),
-          ),
-          UI.el('button', {
-            class: 'btn sm ghost icon-only',
-            title: 'Удалить',
-            onclick: async () => {
-              try {
-                await UI.req(window.api.content.remove(currentInstance().id, file.filename, file.folder));
-                await refreshInstalled();
-              } catch (error) {
-                UI.toast(error.message, 'error');
-              }
-            },
-          }, UI.icon('trash')),
+          { class: 'grow' },
+          UI.el('div', { style: { fontWeight: '600' } }, file.title || file.filename),
+          UI.el('div', {
+            class: 'tiny muted',
+            text: [
+              file.version ? `версия ${file.version}` : '',
+              file.sizeLabel || UI.bytes(file.size),
+              isPackView ? (active ? '' : 'выключен') : file.filename,
+            ].filter(Boolean).join(' • '),
+          }),
         ),
+        isPackView
+          ? packSwitch(file.filename)
+          : UI.el('div', {
+              class: `switch${file.disabled ? '' : ' on'}`,
+              title: file.disabled ? 'Включить' : 'Отключить',
+              onclick: async (event) => {
+                event.stopPropagation();
+                try {
+                  const res = await UI.req(window.api.content.toggle(currentInstance().id, file.filename, file.folder));
+                  file.disabled = !res.enabled;
+                  await refreshInstalled();
+                } catch (error) {
+                  UI.toast(error.message, 'error');
+                }
+              },
+            }),
+        UI.el('button', {
+          class: 'btn sm ghost icon-only',
+          title: 'Удалить',
+          onclick: async () => {
+            try {
+              await UI.req(window.api.content.remove(currentInstance().id, file.filename, file.folder));
+              await refreshInstalled();
+            } catch (error) {
+              UI.toast(error.message, 'error');
+            }
+          },
+        }, UI.icon('trash')),
       );
+      rows.push({ el: row, text: `${file.title || ''} ${file.version || ''} ${file.filename}` });
+      list.append(row);
     }
-    host.append(list);
+    host.append(bar, list);
   }
 
   function htmlToText(text) {
@@ -891,6 +1107,11 @@ window.Views.contentView = (config) => {
 
           actionBtn.disabled = true;
           actionBtn.replaceChildren(UI.icon('refresh'), document.createTextNode('Устанавливаю…'));
+          const offPercent = App.on('progress', (payload) => {
+            if (!payload || payload.projectId !== project.id) return;
+            const percent = Math.max(0, Math.min(100, Number(payload.percent) || 0));
+            actionBtn.replaceChildren(UI.icon('download'), document.createTextNode(`Скачиваю ${Math.round(percent)}%`));
+          });
           try {
             if (isModpack) {
               const result = await UI.req(window.api.content.installModpack(project.id, versionId));
@@ -915,6 +1136,7 @@ window.Views.contentView = (config) => {
           } catch (error) {
             UI.toast(error.message, 'error', 8000);
           } finally {
+            if (typeof offPercent === 'function') offPercent();
             actionBtn.disabled = false;
             if (!isModpack) paintAction();
           }
@@ -1052,8 +1274,8 @@ window.Views.contentView = (config) => {
       tabs.append(browseTab);
       if (needsInstance) tabs.append(installedTab);
 
-      const browse = UI.el('div', { id: 'content-browse' }, buildToolbar(), UI.el('div', { id: 'content-results' }));
-      const installedWrap = UI.el('div', { id: 'content-installed-wrap', class: 'hidden' }, UI.el('div', { id: 'content-installed' }));
+      const browse = UI.el('div', { id: 'content-browse', class: s.tab === 'installed' ? 'hidden' : '' }, buildToolbar(), UI.el('div', { id: 'content-results' }));
+      const installedWrap = UI.el('div', { id: 'content-installed-wrap', class: s.tab === 'installed' ? '' : 'hidden' }, UI.el('div', { id: 'content-installed' }));
 
       browseTab.addEventListener('click', () => {
         s.tab = 'browse';
@@ -1080,12 +1302,28 @@ window.Views.contentView = (config) => {
         );
       }
 
-      search();
+      if (!s.offContentProgress && typeof App.on === 'function') {
+        s.offContentProgress = App.on('progress', (payload) => {
+          if (!payload || !payload.projectId) return;
+          const state = s.installState[payload.projectId];
+          if (!state || !state.busy) return;
+          state.percent = Math.max(0, Math.min(100, Number(payload.percent) || 0));
+          const node = s.installNodes.get(payload.projectId);
+          if (node && node.lastChild) node.lastChild.textContent = `Скачиваю ${Math.round(state.percent)}%`;
+        });
+      }
+
       if (needsInstance) refreshInstalled();
+      if (s.tab !== 'installed') search();
     },
     openProject,
     destroy() {
       s.token += 1;
+      if (s.offContentProgress) {
+        s.offContentProgress();
+        s.offContentProgress = null;
+      }
+      s.installNodes.clear();
       if (s.observer) s.observer.disconnect();
       s.observer = null;
       s.hits = [];

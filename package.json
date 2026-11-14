@@ -1,7 +1,7 @@
 {
   "name": "kubik-launcher",
   "productName": "Kubik Launcher",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "Kubik Launcher вЂ” Р»Р°СѓРЅС‡РµСЂ Minecraft: Ely.by, РјРѕРґС‹, РјРѕРґРїР°РєРё, СЂРµРґР°РєС‚РѕСЂ СЃРєРёРЅРѕРІ",
   "main": "main.js",
   "author": "Kubik",
@@ -12,7 +12,8 @@
     "dev": "electron . --dev",
     "dist": "electron-builder --win nsis portable",
     "dist:portable": "electron-builder --win portable",
-    "dist:installer": "electron-builder --win nsis"
+    "dist:installer": "electron-builder --win nsis",
+    "beta": "electron-builder --win dir && node scripts/beta-shortcut.js"
   },
   "devDependencies": {
     "electron": "^38.0.0",

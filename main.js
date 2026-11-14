@@ -35,6 +35,8 @@ const translate = require('./src/main/translate');
 const javaManager = require('./src/main/java');
 const gameOptions = require('./src/main/options');
 const crash = require('./src/main/crash');
+const packs = require('./src/main/packs');
+const worlds = require('./src/main/worlds');
 const serverPing = require('./src/main/servers');
 const curseforge = require('./src/main/curseforge');
 const packfile = require('./src/main/packfile');
@@ -224,17 +226,54 @@ function progressFor(instanceId, channel = 'install:progress') {
 
 const iconPath = path.join(__dirname, 'build', 'icon.png');
 
+// Номер версии берётся из package.json целиком: бета — это суффикс вида 1.3.0-beta.1.
+function versionLabel() {
+  return app.getVersion();
+}
+
+function lastInstance() {
+  const settings = store.getSettings();
+  const list = instances.listInstances();
+  if (!list.length) return null;
+  return list.find((item) => item.id === settings.lastInstance) || list[0];
+}
+
+async function launchLastFromTray() {
+  try {
+    const instance = lastInstance();
+    const account = store.currentAccount();
+    if (!instance || !account) {
+      showWindow();
+      return;
+    }
+    await launcher.launch(instance, account, {
+      onProgress: () => {},
+      onLog: () => {},
+      onStarted: () => {},
+    });
+  } catch (error) {
+    console.log('[tray-launch]', error.message);
+  }
+  showWindow();
+}
+
 function createTray() {
   if (tray) return;
   try {
     tray = new Tray(iconPath);
     tray.setToolTip('Kubik Launcher');
+    const instance = lastInstance();
     tray.setContextMenu(
       Menu.buildFromTemplate([
-        { label: 'РћС‚РєСЂС‹С‚СЊ Kubik Launcher', click: () => showWindow() },
+        { label: 'Открыть Kubik Launcher', click: () => showWindow() },
+        {
+          label: instance ? `Запустить «${instance.name}»` : 'Запустить сборку',
+          enabled: Boolean(instance),
+          click: () => launchLastFromTray(),
+        },
         { type: 'separator' },
         {
-          label: 'Р’С‹С…РѕРґ',
+          label: 'Выход',
           click: () => {
             quitting = true;
             app.quit();
@@ -242,7 +281,7 @@ function createTray() {
         },
       ]),
     );
-    tray.on('double-click', () => showWindow());
+    tray.on('double-click', () => launchLastFromTray());
   } catch (error) {
     console.log('[tray]', error.message);
   }
@@ -461,6 +500,7 @@ function registerIpc() {
     'app:info',
     wrap(() => ({
       version: app.getVersion(),
+      versionLabel: versionLabel(),
       electron: process.versions.electron,
       chrome: process.versions.chrome,
       node: process.versions.node,
@@ -631,6 +671,16 @@ function registerIpc() {
   }));
   ipcMain.handle('instances:duplicate', wrap(({ id }) => instances.duplicateInstance(id)));
   ipcMain.handle('instances:size', wrap(({ id }) => instances.instanceSize(id)));
+  ipcMain.handle(
+    'instances:repair',
+    wrap(async ({ id }) => {
+      const instance = instances.readInstance(id);
+      if (!instance) throw new Error('Сборка не найдена');
+      const profileVersion = await instances.ensureProfile(instance, () => {});
+      const result = await mojang.installVersion(profileVersion, { verify: true });
+      return { profileVersion, id: result.id };
+    }),
+  );
   ipcMain.handle('instances:options-get', wrap(({ id }) => gameOptions.read(id)));
   ipcMain.handle(
     'instances:options-save',
@@ -658,6 +708,10 @@ function registerIpc() {
     }),
   );
   ipcMain.handle('instances:open-folder', wrap(({ id }) => shell.openPath(paths.instanceDir(id))));
+  ipcMain.handle('worlds:list', wrap(({ instanceId }) => worlds.list(instanceId)));
+  ipcMain.handle('worlds:backup', wrap(({ instanceId, folder }) => worlds.backup(instanceId, folder)));
+  ipcMain.handle('worlds:delete', wrap(({ instanceId, folder }) => worlds.remove(instanceId, folder)));
+  ipcMain.handle('worlds:open', wrap(({ instanceId, folder }) => shell.openPath(worlds.openFolder(instanceId, folder))));
   ipcMain.handle(
     'instances:export',
     wrap(async ({ id, withSaves }) => {
@@ -954,18 +1008,35 @@ function registerIpc() {
   ipcMain.handle('content:installed', wrap(({ instanceId }) => modrinth.installed(instanceId)));
   ipcMain.handle(
     'content:install',
-    wrap(({ instanceId, projectId, versionId }) =>
-      modrinth.installContent(instanceId, projectId, {
-        versionId,
-        autoDeps: true,
-        onProgress: progressFor(instanceId, 'content:progress'),
+    wrap(async ({ instanceId, projectId, versionId }) => {
+      const progress = progressFor(instanceId, 'content:progress');
+      try {
+        return await modrinth.installContent(instanceId, projectId, {
+          versionId,
+          autoDeps: true,
+          onProgress: (payload) => progress({ ...payload, projectId }),
+        });
+      } catch (error) {
+        progress({ stage: 'error', percent: 0, detail: error.message, projectId });
+        throw error;
+      }
+    }),
+  );
+  ipcMain.handle('content:remove', wrap(({ instanceId, target, folder }) => modrinth.removeContent(instanceId, target, folder)));
+  ipcMain.handle('content:toggle', wrap(({ instanceId, target, folder }) => modrinth.toggleContent(instanceId, target, folder)));
+  ipcMain.handle('content:updates', wrap(({ instanceId }) => modrinth.updateProjectCheck(instanceId)));
+  ipcMain.handle(
+    'content:update-all',
+    wrap(({ instanceId }) =>
+      modrinth.updateAll(instanceId, (progress) => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('content:progress', progress);
       }),
     ),
   );
-  ipcMain.handle('content:remove', wrap(({ instanceId, target, folder }) => modrinth.removeContent(instanceId, target, folder)));
-  ipcMain.handle('content:toggle', wrap(({ instanceId, target }) => modrinth.toggleContent(instanceId, target)));
-  ipcMain.handle('content:updates', wrap(({ instanceId }) => modrinth.updateProjectCheck(instanceId)));
   ipcMain.handle('content:popular', wrap(({ projectType, limit }) => modrinth.popular(projectType, limit)));
+  ipcMain.handle('packs:list', wrap(({ instanceId }) => packs.list(instanceId)));
+  ipcMain.handle('packs:toggle', wrap(({ instanceId, filename }) => packs.toggle(instanceId, filename)));
+  ipcMain.handle('packs:move', wrap(({ instanceId, filename, direction }) => packs.move(instanceId, filename, direction)));
   ipcMain.handle(
     'content:modpack-install',
     wrap(({ projectId, versionId, name }) =>

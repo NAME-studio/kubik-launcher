@@ -74,6 +74,11 @@ window.Views.home = (() => {
         progressBox.classList.add('hidden');
         return;
       }
+      if (payload.stage === 'error') {
+        progressBox.classList.add('hidden');
+        if (payload.detail) UI.toast(payload.detail, 'error', 8000);
+        return;
+      }
       progressBox.classList.remove('hidden');
       UI.clear(progressBox);
       const percent = Math.max(0, Math.min(100, payload.percent || 0));
@@ -86,6 +91,10 @@ window.Views.home = (() => {
           UI.el('span', { text: `${percent}%` }),
         ),
       );
+      if (percent >= 100) {
+        clearTimeout(progressBox._hideTimer);
+        progressBox._hideTimer = setTimeout(() => progressBox.classList.add('hidden'), 1200);
+      }
     }
 
     function refreshPlayButton() {
@@ -150,6 +159,10 @@ window.Views.home = (() => {
     refreshPlayButton();
     const progress = instance ? App.state.progress[instance.id] : null;
     if (progress) setProgress(progress);
+    if (typeof App.on === 'function') {
+      refs.offProgress = App.on('progress', (payload) => setProgress(payload || null));
+    }
+
     return hero;
   }
 
@@ -380,6 +393,7 @@ window.Views.home = (() => {
       }
     },
     destroy() {
+      if (typeof refs.offProgress === 'function') refs.offProgress();
       refs = {};
     },
   };

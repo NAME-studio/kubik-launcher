@@ -127,6 +127,26 @@ async function getVersions(projectId, options = {}) {
   }));
 }
 
+function parseVersion(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/(\d+(?:\.\d+)*)(.*)$/);
+  if (!match) return { parts: [], tail: text.toLowerCase() };
+  return { parts: match[1].split('.').map((part) => Number(part) || 0), tail: (match[2] || '').toLowerCase() };
+}
+
+function compareVersions(a, b) {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  const size = Math.max(left.parts.length, right.parts.length);
+  for (let i = 0; i < size; i += 1) {
+    const l = left.parts[i] ?? 0;
+    const r = right.parts[i] ?? 0;
+    if (l !== r) return l > r ? 1 : -1;
+  }
+  if (left.tail !== right.tail) return left.tail > right.tail ? 1 : -1;
+  return 0;
+}
+
 function pickVersion(versions) {
   if (!versions.length) return null;
   const rank = { release: 0, beta: 1, alpha: 2 };
@@ -190,10 +210,28 @@ async function installContent(instanceId, projectId, options = {}) {
   const folder = folderFor(project.project_type);
   const dest = path.join(paths.instanceGameDir(instanceId), folder, file.filename);
   onProgress({ stage: 'download', detail: `Скачиваю ${project.title}`, percent: 5 });
-  await net.downloadFile(file.url, dest, { sha1: file.sha1, size: file.size, timeout: 300000 });
+  let lastPercent = 5;
+  await net.downloadFile(file.url, dest, {
+    sha1: file.sha1,
+    size: file.size,
+    timeout: 300000,
+    onBytes: (chunk, info) => {
+      const total = (info && info.total) || file.size || 0;
+      if (!total) return;
+      const percent = Math.min(95, Math.max(5, Math.round((info.received / total) * 90) + 5));
+      if (percent === lastPercent) return;
+      lastPercent = percent;
+      onProgress({ stage: 'download', detail: `Скачиваю ${project.title}`, percent });
+    },
+  });
   onProgress({ stage: 'done', detail: `${project.title} установлен`, percent: 100 });
 
   const content = readContent(instanceId);
+  const previous = content.items.find((item) => item.projectId === project.id);
+  if (previous && previous.filename && previous.filename !== file.filename) {
+    unlinkQuiet(path.join(paths.instanceGameDir(instanceId), previous.folder, previous.filename));
+    unlinkQuiet(path.join(paths.instanceGameDir(instanceId), previous.folder, `${previous.filename}.disabled`));
+  }
   content.items = content.items.filter((item) => item.projectId !== project.id);
   content.items.push({
     projectId: project.id,
@@ -240,6 +278,62 @@ async function installContent(instanceId, projectId, options = {}) {
   };
 }
 
+const jarMetaCache = new Map();
+
+function readJarMeta(fullPath, file) {
+  let stat;
+  try {
+    stat = fs.statSync(fullPath);
+  } catch {
+    return null;
+  }
+  const cacheKey = `${fullPath}|${stat.mtimeMs}|${stat.size}`;
+  const cached = jarMetaCache.get(cacheKey);
+  if (cached) return cached;
+
+  const fallback = String(file).replace(/\.jar(\.disabled)?$/i, '').replace(/\.disabled$/i, '');
+  let title = '';
+  let version = '';
+
+  try {
+    const toml = zip.readFile(fullPath, 'META-INF/mods.toml');
+    if (toml) {
+      const text = toml.toString('utf8');
+      const start = text.indexOf('[[mods]]');
+      const block = start >= 0 ? text.slice(start) : text;
+      const readValue = (name) => {
+        const match = block.match(new RegExp(`^\\s*${name}\\s*=\\s*["']([^"']*)["']`, 'm'));
+        return match ? match[1].trim() : '';
+      };
+      title = readValue('displayName') || readValue('modId');
+      version = readValue('version');
+    } else {
+      const manifest = zip.readJson(fullPath, 'fabric.mod.json');
+      if (manifest) {
+        title = manifest.name || manifest.id || '';
+        version = manifest.version || '';
+      }
+    }
+    if (!version || version.startsWith('${')) {
+      const mf = zip.readFile(fullPath, 'META-INF/MANIFEST.MF');
+      if (mf) {
+        const match = mf.toString('utf8').match(/Implementation-Version:\s*(\S+)/i);
+        if (match) version = match[1];
+      }
+    }
+  } catch {
+    /* битый архив — покажем имя файла */
+  }
+
+  const meta = {
+    title: title || fallback,
+    version: version && !version.startsWith('${') ? version : '',
+  };
+  if (jarMetaCache.size > 600) jarMetaCache.clear();
+  jarMetaCache.set(cacheKey, meta);
+  return meta;
+}
+
 function installed(instanceId) {
   const content = readContent(instanceId);
   const gameDir = paths.instanceGameDir(instanceId);
@@ -249,7 +343,8 @@ function installed(instanceId) {
     const dir = path.join(gameDir, folder);
     if (!exists(dir)) continue;
     for (const file of fs.readdirSync(dir)) {
-      if (tracked.has(`${folder}/${file}`)) continue;
+      const base = file.replace(/\.disabled$/i, '');
+      if (tracked.has(`${folder}/${file}`) || tracked.has(`${folder}/${base}`)) continue;
       if (file === 'desktop.ini' || file === '.DS_Store') continue;
       let size = 0;
       try {
@@ -257,7 +352,20 @@ function installed(instanceId) {
       } catch {
         /* ignore */
       }
-      manual.push({ projectType: type, folder, filename: file, size, manual: true, disabled: file.endsWith('.disabled') });
+      const disabled = file.endsWith('.disabled');
+      const meta = disabled || /\.(jar|zip)$/i.test(file) ? readJarMeta(path.join(dir, file), file) : null;
+      manual.push({
+        projectType: type,
+        folder,
+        filename: file,
+        size,
+        sizeLabel: formatBytes(size),
+        manual: true,
+        disabled,
+        enabled: !disabled,
+        title: meta ? meta.title : file,
+        version: meta ? meta.version : '',
+      });
     }
   }
   return {
@@ -293,13 +401,15 @@ function removeContent(instanceId, projectIdOrFilename, folderHint) {
   return false;
 }
 
-function toggleContent(instanceId, projectIdOrFilename) {
+function toggleContent(instanceId, projectIdOrFilename, folderHint) {
   const content = readContent(instanceId);
   const gameDir = paths.instanceGameDir(instanceId);
-  const item = content.items.find((i) => i.projectId === projectIdOrFilename || i.filename === projectIdOrFilename);
+  const target = String(projectIdOrFilename || '');
+  const item = content.items.find((i) => i.projectId === target || i.filename === target);
   if (!item) {
-    const folder = content.items.length ? content.items[0].folder : 'mods';
-    const file = path.join(gameDir, folder, projectIdOrFilename);
+    const folder = folderHint || (content.items.length ? content.items[0].folder : 'mods');
+    const base = target.replace(/\.disabled$/i, '');
+    const file = path.join(gameDir, folder, base);
     if (exists(file)) {
       fs.renameSync(file, `${file}.disabled`);
       return { enabled: false };
@@ -469,7 +579,7 @@ async function updateProjectCheck(instanceId) {
         loader: instance.loader.type === 'vanilla' ? null : instance.loader.type,
       });
       const best = pickVersion(versions);
-      if (best && best.id !== item.versionId) {
+      if (best && best.id !== item.versionId && compareVersions(best.versionNumber, item.versionNumber) > 0) {
         updates.push({
           projectId: item.projectId,
           title: item.title,
@@ -483,6 +593,26 @@ async function updateProjectCheck(instanceId) {
     }
   }
   return updates;
+}
+
+async function updateAll(instanceId, onProgress) {
+  const updates = await updateProjectCheck(instanceId);
+  const results = [];
+  for (const update of updates) {
+    try {
+      await installContent(instanceId, update.projectId, {
+        versionId: update.versionId,
+        autoDeps: false,
+        onProgress: (progress) => {
+          if (onProgress) onProgress({ ...progress, detail: update.title });
+        },
+      });
+      results.push({ title: update.title, from: update.current, to: update.latest, ok: true });
+    } catch (error) {
+      results.push({ title: update.title, from: update.current, to: update.latest, ok: false, error: error.message });
+    }
+  }
+  return results;
 }
 
 module.exports = {
@@ -500,6 +630,7 @@ module.exports = {
   popular,
   featuredModpacks,
   updateProjectCheck,
+  updateAll,
   pickVersion,
 };
 

@@ -250,6 +250,22 @@ async function browse({ page = 1, size = 30, refresh = false } = {}) {
     return result;
   }
 
+  // Старая страница отдаётся мгновенно, свежая догружается в фоне.
+  if (!refresh && stored && (stored.items || []).length) {
+    const quick = cachedResult(stored, true);
+    catalogCache.set(key, quick);
+    fetchPage(pageNumber, pageSize)
+      .then((result) => {
+        if (!result.items.length) return;
+        catalogCache.set(key, result);
+        const nextDisk = readDiskCache();
+        nextDisk[key] = { page: result.page, total: result.total, hasMore: result.hasMore, items: result.items, at: result.at };
+        writeDiskCache(nextDisk);
+      })
+      .catch(() => {});
+    return quick;
+  }
+
   try {
     const result = await fetchPage(pageNumber, pageSize);
     if (!result.items.length && stored && (stored.items || []).length) {

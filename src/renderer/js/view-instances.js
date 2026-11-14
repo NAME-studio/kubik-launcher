@@ -505,12 +505,109 @@ window.Views.instances = (() => {
       ),
     );
 
+    async function openWorlds(target) {
+      const body = UI.el('div', { class: 'stack' }, UI.el('div', { class: 'skeleton', style: { minHeight: '100px' } }));
+      UI.modal({ title: 'Миры', subtitle: target.name, wide: true, body, actions: [{ label: 'Закрыть', kind: 'ghost' }] });
+
+      const render = async () => {
+        UI.clear(body);
+        let list = [];
+        try {
+          list = await UI.req(window.api.worlds.list(target.id));
+        } catch (error) {
+          body.append(UI.el('div', { class: 'notice' }, UI.icon('alert'), UI.el('span', {}, error.message)));
+          return;
+        }
+        if (!list.length) {
+          body.append(
+            UI.el('div', { class: 'card empty' },
+              UI.el('h3', {}, 'Миров пока нет'),
+              UI.el('p', {}, 'Мир появится здесь после первого запуска игры в этой сборке.'),
+            ),
+          );
+          return;
+        }
+        const wrap = UI.el('div', { class: 'list' });
+        for (const world of list) {
+          wrap.append(
+            UI.el('div', { class: 'installed-row' },
+              UI.el('div', { class: 'mod-icon placeholder', style: { width: '38px', height: '38px' } }, UI.icon('map')),
+              UI.el('div', { class: 'grow' },
+                UI.el('div', { style: { fontWeight: '600' } }, world.title),
+                UI.el('div', { class: 'tiny muted', text: `${UI.bytes(world.size)} • ${new Date(world.modified || Date.now()).toLocaleDateString('ru-RU')}` }),
+              ),
+              UI.el('button', {
+                class: 'btn sm ghost icon-only',
+                title: 'Открыть папку мира',
+                onclick: () => window.api.worlds.open(target.id, world.folder),
+              }, UI.icon('folder')),
+              UI.el('button', {
+                class: 'btn sm ghost icon-only',
+                title: 'Сделать копию .zip',
+                onclick: async () => {
+                  try {
+                    const result = await UI.req(window.api.worlds.backup(target.id, world.folder));
+                    UI.toast(`Копия мира: ${result.files} файлов`, 'success', 8000);
+                  } catch (error) {
+                    UI.toast(error.message, 'error');
+                  }
+                },
+              }, UI.icon('save')),
+              UI.el('button', {
+                class: 'btn sm ghost icon-only',
+                title: 'Удалить мир',
+                onclick: async () => {
+                  const confirmed = await UI.confirm('Удалить мир?', `«${world.title}» переедет в корзину лаунчера.`, {
+                    okText: 'Удалить',
+                    danger: true,
+                  });
+                  if (!confirmed) return;
+                  try {
+                    await UI.req(window.api.worlds.remove(target.id, world.folder));
+                    UI.toast('Мир в корзине', 'success');
+                    await render();
+                  } catch (error) {
+                    UI.toast(error.message, 'error');
+                  }
+                },
+              }, UI.icon('trash')),
+            ),
+          );
+        }
+        body.append(wrap);
+      };
+
+      await render();
+    }
+
     const modal = UI.modal({
       title: instance.name,
       subtitle: 'Настройки сборки',
       wide: true,
       body,
       actions: [
+        {
+          label: 'Проверить файлы',
+          icon: 'shield',
+          onClick: async () => {
+            try {
+              UI.toast('Проверяю файлы сборки…', 'info', 4000);
+              await UI.req(window.api.instances.repair(instance.id));
+              UI.toast('Файлы на месте', 'success');
+            } catch (error) {
+              UI.toast(error.message, 'error', 9000);
+            }
+            return false;
+          },
+        },
+        {
+          label: 'Миры',
+          icon: 'map',
+          onClick: () => {
+            openWorlds(instance);
+            return false;
+          },
+        },
         {
           label: 'Экспорт',
           onClick: async () => {

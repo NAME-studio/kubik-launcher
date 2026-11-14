@@ -69,6 +69,7 @@ contextBridge.exposeInMainWorld('api', {
     restoreTrash: () => invoke('instances:restore-trash'),
     duplicate: (id) => invoke('instances:duplicate', { id }),
     size: (id) => invoke('instances:size', { id }),
+    repair: (id) => invoke('instances:repair', { id }),
     openFolder: (id) => invoke('instances:open-folder', { id }),
     exportPack: (id, withSaves) => invoke('instances:export', { id, withSaves }),
     importPack: () => invoke('instances:import'),
@@ -168,10 +169,24 @@ contextBridge.exposeInMainWorld('api', {
     installed: (instanceId) => invoke('content:installed', { instanceId }),
     install: (instanceId, projectId, versionId) => invoke('content:install', { instanceId, projectId, versionId }),
     remove: (instanceId, target, folder) => invoke('content:remove', { instanceId, target, folder }),
-    toggle: (instanceId, target) => invoke('content:toggle', { instanceId, target }),
+    toggle: (instanceId, target, folder) => invoke('content:toggle', { instanceId, target, folder }),
     updates: (instanceId) => invoke('content:updates', { instanceId }),
+    updateAll: (instanceId) => invoke('content:update-all', { instanceId }),
     popular: (projectType, limit) => invoke('content:popular', { projectType, limit }),
     installModpack: (projectId, versionId, name) => invoke('content:modpack-install', { projectId, versionId, name }),
+  },
+
+  packs: {
+    list: (instanceId) => invoke('packs:list', { instanceId }),
+    toggle: (instanceId, filename) => invoke('packs:toggle', { instanceId, filename }),
+    move: (instanceId, filename, direction) => invoke('packs:move', { instanceId, filename, direction }),
+  },
+
+  worlds: {
+    list: (instanceId) => invoke('worlds:list', { instanceId }),
+    backup: (instanceId, folder) => invoke('worlds:backup', { instanceId, folder }),
+    remove: (instanceId, folder) => invoke('worlds:delete', { instanceId, folder }),
+    open: (instanceId, folder) => invoke('worlds:open', { instanceId, folder }),
   },
 
   java: {

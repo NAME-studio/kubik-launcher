@@ -1057,7 +1057,7 @@
             App.state.javaList = App.state.javaList || [];
           });
       }, 400);
-      document.getElementById('tb-version').textContent = `v${App.state.info.version}`;
+      document.getElementById('tb-version').textContent = `v${App.state.info.versionLabel || App.state.info.version}`;
       updateStatus();
       document.title = 'Kubik Launcher';
       updateAccountCard();
