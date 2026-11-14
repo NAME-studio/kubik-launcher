@@ -9,6 +9,25 @@ const { ensureDir } = require('./util');
 
 const CYRILLIC = /[а-яё]/i;
 const MAX_ENTRIES = 3000;
+const CHUNK = 450;
+const MAX_TOTAL = 8000;
+const BROKEN = /QUERY LENGTH LIMIT|MAX ALLOWED QUERY|MYMEMORY WARNING|INVALID SOURCE LANGUAGE|PLEASE SELECT TWO DISTINCT/i;
+
+function splitText(text, limit) {
+  const chunks = [];
+  let rest = text;
+  while (rest.length > limit) {
+    let cut = rest.lastIndexOf('\n\n', limit);
+    if (cut < limit * 0.4) cut = rest.lastIndexOf('\n', limit);
+    if (cut < limit * 0.4) cut = rest.lastIndexOf('. ', limit);
+    if (cut < limit * 0.4) cut = rest.lastIndexOf(' ', limit);
+    if (cut <= 0) cut = limit;
+    chunks.push(rest.slice(0, cut + 1).trim());
+    rest = rest.slice(cut + 1);
+  }
+  if (rest.trim()) chunks.push(rest.trim());
+  return chunks.filter(Boolean);
+}
 
 let cache = null;
 let saveTimer = null;
@@ -60,8 +79,11 @@ async function viaMyMemory(text, from, to) {
   const pair = `${from === 'auto' ? 'en' : from}|${to}`;
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${encodeURIComponent(pair)}`;
   const data = await net.fetchJson(url, { timeout: 12000 });
+  const status = data && Number(data.responseStatus);
   const value = data && data.responseData && data.responseData.translatedText;
+  if (status && status !== 200) throw new Error('MyMemory: ' + status);
   if (!value || typeof value !== 'string') throw new Error('Переводчик не ответил');
+  if (BROKEN.test(value)) throw new Error('MyMemory: лимит запроса');
   return value.trim();
 }
 
@@ -88,15 +110,30 @@ async function translate(text, options = {}) {
     return { text: source, cached: false, skipped: true };
   }
 
+  if (to === 'en' && !CYRILLIC.test(source) && /[a-z]/i.test(source)) {
+    return { text: source, cached: false, skipped: true };
+  }
+
   const key = crypto.createHash('sha1').update(`${to}:${source}`).digest('hex');
   const store = loadCache();
   if (store[key]) return { text: store[key], cached: true };
 
-  const result = await viaAny(source, from, to);
+  const clipped = source.length > MAX_TOTAL ? source.slice(0, MAX_TOTAL) : source;
+  const chunks = clipped.length > CHUNK ? splitText(clipped, CHUNK) : [clipped];
 
-  store[key] = result.value;
+  const parts = [];
+  for (const chunk of chunks) {
+    const result = await viaAny(chunk, from, to);
+    parts.push(result.value);
+  }
+
+  let value = parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (source.length > MAX_TOTAL) value += '\n\n… (описание обрезано)';
+  if (!value) throw new Error('Пустой перевод');
+
+  store[key] = value;
   scheduleSave();
-  return { text: result.value, cached: false, provider: result.provider };
+  return { text: value, cached: false, provider: 'chunked' };
 }
 
 function stats() {

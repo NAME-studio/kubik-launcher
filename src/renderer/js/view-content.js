@@ -566,10 +566,42 @@ window.Views.contentView = (config) => {
           },
           'Перевести на русский',
         );
+        const translateEnButton = UI.el(
+          'button',
+          {
+            class: 'btn sm ghost',
+            onclick: async () => {
+              translateEnButton.disabled = true;
+              const label = translateEnButton.textContent;
+              translateEnButton.textContent = 'Перевожу…';
+              try {
+                const result = await UI.req(window.api.content.translate(fullText, 'en'));
+                if (result && result.text) descNode.textContent = result.text;
+                translatedNote.classList.remove('hidden');
+              } catch (error) {
+                UI.toast(error.message, 'error', 7000);
+              }
+              translateEnButton.disabled = false;
+              translateEnButton.textContent = label;
+            },
+          },
+          'Перевести на английский',
+        );
         const settingsNow = (App.state && App.state.settings) || {};
-        if (fullText && !/[а-яё]/i.test(fullText)) {
-          body.append(UI.el('div', { class: 'row', style: { gap: '8px', alignItems: 'center' } }, translateButton, translatedNote));
-          if (settingsNow.translateDescriptions !== false) setTimeout(() => translateButton.click(), 80);
+        if (fullText) {
+          body.append(
+            UI.el(
+              'div',
+              { class: 'row', style: { gap: '8px', alignItems: 'center' } },
+              translateButton,
+              translateEnButton,
+              translatedNote,
+            ),
+          );
+          if (settingsNow.translateDescriptions !== false) {
+            const auto = /[а-яё]/i.test(fullText) ? translateEnButton : translateButton;
+            setTimeout(() => auto.click(), 80);
+          }
         }
 
         if ((project.files || []).length) {
@@ -696,16 +728,51 @@ window.Views.contentView = (config) => {
           },
           'Перевести на русский',
         );
+        const translateEnButton = UI.el(
+          'button',
+          {
+            class: 'btn sm ghost',
+            onclick: async () => {
+              translateEnButton.disabled = true;
+              const label = translateEnButton.textContent;
+              translateEnButton.textContent = 'Перевожу…';
+              try {
+                if (project.description) {
+                  const short = await UI.req(window.api.content.translate(project.description, 'en'));
+                  if (short && short.text && descNode) descNode.textContent = short.text;
+                }
+                if (project.body) {
+                  const long = await UI.req(window.api.content.translate(project.body.slice(0, 4000), 'en'));
+                  if (long && long.text && bodyWrap) bodyWrap.innerHTML = UI.md(long.text);
+                }
+                translatedNote.classList.remove('hidden');
+              } catch (error) {
+                UI.toast(error.message, 'error', 7000);
+              }
+              translateEnButton.disabled = false;
+              translateEnButton.textContent = label;
+            },
+          },
+          'Перевести на английский',
+        );
         if (descNode) body.append(descNode);
         const settingsNow = (App.state && App.state.settings) || {};
-        const needsTranslation = Boolean(project.description && !/[а-яё]/i.test(project.description));
+        const sourceText = String(project.description || project.body || '');
+        const cyrillicSource = /[а-яё]/i.test(sourceText);
         if (project.description || project.body) {
           body.append(
-            UI.el('div', { class: 'row', style: { gap: '8px', alignItems: 'center' } }, translateButton, translatedNote),
+            UI.el(
+              'div',
+              { class: 'row', style: { gap: '8px', alignItems: 'center' } },
+              translateButton,
+              translateEnButton,
+              translatedNote,
+            ),
           );
         }
-        if (settingsNow.translateDescriptions !== false && needsTranslation) {
-          setTimeout(() => translateButton.click(), 80);
+        if (settingsNow.translateDescriptions !== false && sourceText) {
+          const auto = cyrillicSource ? translateEnButton : translateButton;
+          setTimeout(() => auto.click(), 80);
         }
 
         const versionSelect = UI.el('select', { class: 'select' });
