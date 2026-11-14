@@ -119,7 +119,11 @@ function extract(zipPath, destDir, options = {}) {
 function readJson(zipPath, entryName) {
   const data = readFile(zipPath, entryName);
   if (!data) return null;
-  return JSON.parse(data.toString('utf8'));
+  try {
+    return JSON.parse(data.toString('utf8'));
+  } catch {
+    throw new Error(`Файл ${entryName} внутри ${path.basename(zipPath)} повреждён или это не JSON`);
+  }
 }
 
 module.exports = { list, readFile, readJson, extract, safeJoin };

@@ -32,13 +32,27 @@ async function getManifest(force = false) {
   if (manifestCache && !force && Date.now() - manifestTime < 10 * 60 * 1000) return manifestCache;
   const cacheFile = path.join(paths.cache(), 'version_manifest_v2.json');
   const readCache = () => {
-    manifestCache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-    manifestTime = Date.now();
-    return manifestCache;
+    try {
+      manifestCache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+      manifestTime = Date.now();
+      return manifestCache;
+    } catch {
+      manifestCache = null;
+      manifestTime = 0;
+      try {
+        fs.unlinkSync(cacheFile);
+      } catch {
+        /* ignore */
+      }
+      return null;
+    }
   };
   if (!force && exists(cacheFile)) {
     try {
-      if (Date.now() - fs.statSync(cacheFile).mtimeMs < 10 * 60 * 1000) return readCache();
+      if (Date.now() - fs.statSync(cacheFile).mtimeMs < 10 * 60 * 1000) {
+        const cached = readCache();
+        if (cached) return cached;
+      }
     } catch {
       /* ignore */
     }
@@ -51,7 +65,8 @@ async function getManifest(force = false) {
     manifestTime = Date.now();
     return manifest;
   } catch (error) {
-    if (exists(cacheFile)) return readCache();
+    const cached = readCache();
+    if (cached) return cached;
     throw error;
   }
 }

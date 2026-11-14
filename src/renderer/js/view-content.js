@@ -331,17 +331,62 @@ window.Views.contentView = (config) => {
                   ? 'CurseForge недоступен в вашей сети'
                   : 'CurseForge временно недоступен')
             : 'Каталог недоступен';
+        if (needsKey) {
+          const keyInput = UI.el('input', {
+            class: 'input',
+            type: 'password',
+            placeholder: 'Вставьте ключ сюда',
+            style: { minWidth: '240px', flex: '1 1 220px' },
+          });
+          const saveKey = async () => {
+            const value = keyInput.value.trim();
+            if (!value) {
+              UI.toast('Вставьте ключ CurseForge', 'info');
+              return;
+            }
+            try {
+              await UI.req(window.api.settings.save({ curseforgeKey: value }));
+              UI.toast('Ключ сохранён, повторяю поиск', 'success');
+              search(false);
+            } catch (error) {
+              UI.toast(error.message, 'error', 7000);
+            }
+          };
+
+          host.append(
+            UI.el(
+              'div',
+              { class: 'card empty' },
+              UI.el('h3', {}, 'Для CurseForge нужен бесплатный ключ'),
+              UI.el(
+                'p',
+                {},
+                'Ключ выдаётся один раз за минуту: войдите на console.curseforge.com, создайте API Key и вставьте его ниже. Это бесплатно и делается однажды — лаунчер запомнит ключ.',
+              ),
+              UI.el(
+                'div',
+                { class: 'row', style: { gap: '8px', justifyContent: 'center', flexWrap: 'wrap' } },
+                UI.el(
+                  'button',
+                  { class: 'btn sm', onclick: () => window.api.openExternal('https://console.curseforge.com/') },
+                  'Получить ключ',
+                ),
+                keyInput,
+                UI.el('button', { class: 'btn sm primary', onclick: saveKey }, 'Сохранить'),
+                UI.el('button', { class: 'btn sm ghost', onclick: () => search(false) }, 'Повторить'),
+              ),
+              UI.el('p', { class: 'small muted' }, 'Пока ключа нет — каталог Modrinth работает без всяких настроек.'),
+            ),
+          );
+          return;
+        }
+
         host.append(
           UI.el('div', { class: 'card empty' },
             UI.el('h3', {}, title),
             UI.el('p', {}, s.lastError),
             UI.el('div', { class: 'row', style: { gap: '8px', justifyContent: 'center' } },
-              needsKey
-                ? UI.el('button', { class: 'btn sm primary', onclick: () => App.go('settings') }, UI.icon('settings'), 'Открыть настройки')
-                : UI.el('button', { class: 'btn sm primary', onclick: () => search(false) }, UI.icon('refresh'), 'Повторить'),
-              needsKey
-                ? UI.el('button', { class: 'btn sm', onclick: () => search(false) }, UI.icon('refresh'), 'Повторить')
-                : null,
+              UI.el('button', { class: 'btn sm primary', onclick: () => search(false) }, UI.icon('refresh'), 'Повторить'),
             ),
           ),
         );
