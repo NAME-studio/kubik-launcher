@@ -9,6 +9,7 @@ const mojang = require('./mojang');
 const java = require('./java');
 const instances = require('./instances');
 const ely = require('./ely');
+const gameOptions = require('./options');
 const { ensureDir, isAllowed, exists } = require('./util');
 
 const LAUNCHER_NAME = 'KubikLauncher';
@@ -214,6 +215,11 @@ function logFileFor(instanceId) {
 
 async function launch(instance, account, handlers = {}) {
   if (running.has(instance.id)) throw new Error('Этот профиль уже запущен');
+  try {
+    gameOptions.ensureOnboardingSkipped(instance.id);
+  } catch {
+    /* если файл недоступен — игра сама создаст options.txt */
+  }
   const onProgress = handlers.onProgress || (() => {});
   const onLog = handlers.onLog || (() => {});
   const onExit = handlers.onExit || (() => {});

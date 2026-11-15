@@ -1,8 +1,8 @@
 {
   "name": "kubik-launcher",
   "productName": "Kubik Launcher",
-  "version": "1.2.6",
-  "description": "Kubik Launcher вЂ” Р»Р°СѓРЅС‡РµСЂ Minecraft: Ely.by, РјРѕРґС‹, РјРѕРґРїР°РєРё, СЂРµРґР°РєС‚РѕСЂ СЃРєРёРЅРѕРІ",
+  "version": "1.2.7",
+  "description": "Kubik Launcher — лаунчер Minecraft: Ely.by, моды, модпаки, редактор скинов",
   "main": "main.js",
   "author": "Kubik",
   "license": "MIT",

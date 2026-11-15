@@ -57,7 +57,7 @@ function moveIfFree(from, to) {
   try {
     if (exists(from) && !exists(to)) fs.renameSync(from, to);
   } catch {
-    /* РјРёРіСЂР°С†РёСЏ РЅРµ РєСЂРёС‚РёС‡РЅР° */
+    /* миграция не критична */
   }
 }
 
@@ -124,22 +124,22 @@ function migrateLegacyLayout() {
 }
 
 const GUIDE = [
-  'Kubik Launcher вЂ” РїР°РїРєР° Р»Р°СѓРЅС‡РµСЂР°',
+  'Kubik Launcher — папка лаунчера',
   '================================',
   '',
-  'versions   вЂ” СЃР±РѕСЂРєРё Minecraft: РєР°Р¶РґР°СЏ РІ СЃРІРѕРµР№ РїР°РїРєРµ (РјРѕРґС‹, resourcepacks,',
-  '             shaderpacks, saves, config, instance.json) Рё С„Р°Р№Р»С‹ РІРµСЂСЃРёР№ РёРіСЂС‹.',
-  'libraries  вЂ” РѕР±С‰РёРµ Р±РёР±Р»РёРѕС‚РµРєРё РґР»СЏ РІСЃРµС… СЃР±РѕСЂРѕРє (СЃРєР°С‡РёРІР°СЋС‚СЃСЏ РѕРґРёРЅ СЂР°Р·).',
-  'assets     вЂ” Р·РІСѓРєРё, СЏР·С‹РєРё Рё СЂРµСЃСѓСЂСЃС‹ Minecraft.',
-  'runtime    вЂ” Java, РєРѕС‚РѕСЂСѓСЋ Р»Р°СѓРЅС‡РµСЂ СЃРєР°С‡Р°Р» СЃР°Рј.',
-  'cache      вЂ” РІСЂРµРјРµРЅРЅС‹Рµ Р·Р°РіСЂСѓР·РєРё (РјРѕР¶РЅРѕ СѓРґР°Р»СЏС‚СЊ).',
-  'skins      вЂ” skins/<id>.png вЂ” СЃРєРёРЅС‹ РѕС„Р»Р°Р№РЅ-Р°РєРєР°СѓРЅС‚РѕРІ.',
-  'logs       вЂ” Р»РѕРіРё Р·Р°РїСѓСЃРєРѕРІ РёРіСЂС‹.',
-  'config.json    вЂ” РЅР°СЃС‚СЂРѕР№РєРё Р»Р°СѓРЅС‡РµСЂР°.',
-  'accounts.json  вЂ” Р°РєРєР°СѓРЅС‚С‹ (РЅРёРє, С‚РѕРєРµРЅС‹). РќРёС‡РµРіРѕ СѓРґР°Р»СЏС‚СЊ РЅРµ РЅСѓР¶РЅРѕ.',
+  'versions   — сборки Minecraft: каждая в своей папке (моды, resourcepacks,',
+  '             shaderpacks, saves, config, instance.json) и файлы версий игры.',
+  'libraries  — общие библиотеки для всех сборок (скачиваются один раз).',
+  'assets     — звуки, языки и ресурсы Minecraft.',
+  'runtime    — Java, которую лаунчер скачал сам.',
+  'cache      — временные загрузки (можно удалять).',
+  'skins      — skins/<id>.png — скины офлайн-аккаунтов.',
+  'logs       — логи запусков игры.',
+  'config.json    — настройки лаунчера.',
+  'accounts.json  — аккаунты (ник, токены). Ничего удалять не нужно.',
   '',
-  'Р§С‚РѕР±С‹ РЅР°С‡Р°С‚СЊ: РѕС‚РєСЂРѕР№С‚Рµ Р»Р°СѓРЅС‡РµСЂ, РІС‹Р±РµСЂРёС‚Рµ РЅРёРє РёР»Рё РІРѕР№РґРёС‚Рµ С‡РµСЂРµР· Ely.by,',
-  'СЃРѕР·РґР°Р№С‚Рµ СЃР±РѕСЂРєСѓ Рё РЅР°Р¶РјРёС‚Рµ В«РРіСЂР°С‚СЊВ».',
+  'Чтобы начать: откройте лаунчер, выберите ник или войдите через Ely.by,',
+  'создайте сборку и нажмите «Играть».',
 ].join('\r\n');
 
 function writeGuide(root) {
@@ -147,7 +147,7 @@ function writeGuide(root) {
     const file = path.join(root, 'README.txt');
     if (!exists(file)) fs.writeFileSync(file, GUIDE, 'utf8');
   } catch {
-    /* РЅРµ РєСЂРёС‚РёС‡РЅРѕ */
+    /* не критично */
   }
 }
 
@@ -206,7 +206,7 @@ function setTaskbarProgress(value) {
   try {
     mainWindow.setProgressBar(value);
   } catch {
-    /* РѕРєРЅРѕ РјРѕРіР»Рѕ Р·Р°РєСЂС‹С‚СЊСЃСЏ */
+    /* окно могло закрыться */
   }
 }
 
@@ -404,7 +404,7 @@ function createWindow() {
             const images = Array.from(page.querySelectorAll('img'));
             const pending = images.filter((img) => !img.complete || img.naturalWidth === 0).length;
             const text = page.textContent || '';
-            const loading = /Р—Р°РіСЂСѓР¶Р°СЋ|Р—Р°РіСЂСѓР·РєР°|РџРѕРґРѕР¶РґРёС‚Рµ|РС‰Сѓ|Loading/.test(text);
+            const loading = /Загружаю|Загрузка|Подождите|Ищу|Loading/.test(text);
             return {
               ok: !busy && !pending && !loading,
               length: text.length,
@@ -430,7 +430,7 @@ function createWindow() {
           await new Promise((resolve) => setTimeout(resolve, 1200));
           const image = await mainWindow.webContents.capturePage();
           fs.writeFileSync(path.join(dir, `shot-${route}.png`), image.toPNG());
-          console.log('[shot]', route, state.ok ? 'ready' : 'timeout', `${state.length} СЃРёРјРІ.`);
+          console.log('[shot]', route, state.ok ? 'ready' : 'timeout', `${state.length} симв.`);
         } catch (error) {
           console.log('[shot-error]', route, error.message);
         }
@@ -452,7 +452,7 @@ function createWindow() {
       console.log('[render-process-gone]', JSON.stringify(details));
     });
     setTimeout(() => {
-      console.log('[smoke] Р·Р°РІРµСЂС€РµРЅРёРµ');
+      console.log('[smoke] завершение');
       quitting = true;
       app.quit();
     }, limit);
@@ -525,7 +525,7 @@ function registerIpc() {
   ipcMain.handle(
     'app:firebase-auth',
     wrap(async () => {
-      // РћС€РёР±РєСѓ РїСЂРѕР±СЂР°СЃС‹РІР°РµРј вЂ” РѕР±С‘СЂС‚РєР° wrap СЃР°РјР° РІРµСЂРЅС‘С‚ {ok:false,error}, Р±РµР· РґРІРѕР№РЅРѕРіРѕ ok.
+      // Ошибку пробрасываем — обёртка wrap сама вернёт {ok:false,error}, без двойного ok.
       const session = await firebaseAuth.ensureSession();
       return { uid: session.uid || '' };
     }),
@@ -551,7 +551,7 @@ function registerIpc() {
     'app:pick-folder',
     wrap(async ({ title }) => {
       const result = await dialog.showOpenDialog(mainWindow, {
-        title: title || 'Р’С‹Р±РµСЂРёС‚Рµ РїР°РїРєСѓ',
+        title: title || 'Выберите папку',
         properties: ['openDirectory', 'createDirectory'],
       });
       return result.canceled ? null : result.filePaths[0];
@@ -583,7 +583,7 @@ function registerIpc() {
       } else {
         store.saveSettings(patch);
       }
-      // РЎРјРµРЅРёР»Рё РїСЂРѕРµРєС‚ РёР»Рё РєР»СЋС‡ Firebase вЂ” СЃС‚Р°СЂС‹Р№ С‚РѕРєРµРЅ С‡СѓР¶РѕР№ СЃРµСЃСЃРёРё Р±РѕР»СЊС€Рµ РЅРµ РіРѕРґРёС‚СЃСЏ.
+      // Сменили проект или ключ Firebase — старый токен чужой сессии больше не годится.
       if (
         (patch.firebaseApiKey !== undefined && patch.firebaseApiKey !== previous.firebaseApiKey) ||
         (patch.firebaseProjectId !== undefined && patch.firebaseProjectId !== previous.firebaseProjectId)
@@ -643,12 +643,17 @@ function registerIpc() {
     'instances:create',
     wrap((options) => {
       const created = instances.createInstance(options);
+      try {
+        gameOptions.ensureOnboardingSkipped(created.id);
+      } catch {
+        /* профиль ещё не создан — допишем настройки при запуске */
+      }
       const globals = store.getSettings().globalOptions;
       if (store.getSettings().syncGameOptions !== false && globals && Object.keys(globals).length) {
         try {
           gameOptions.write(created.id, globals);
         } catch {
-          /* РЅР°СЃС‚СЂРѕР№РєРё РЅРµ РєСЂРёС‚РёС‡РЅС‹ РґР»СЏ СЃРѕР·РґР°РЅРёСЏ */
+          /* настройки не критичны для создания */
         }
       }
       return created;
@@ -656,13 +661,13 @@ function registerIpc() {
   );
   ipcMain.handle('instances:update', wrap(({ id, patch }) => instances.updateInstance(id, patch)));
   ipcMain.handle('instances:delete', wrap(async ({ id }) => {
-    if (launcher.isRunning(id)) throw new Error('РЎРЅР°С‡Р°Р»Р° Р·Р°РєСЂРѕР№С‚Рµ РёРіСЂСѓ вЂ” СЃР±РѕСЂРєР° Р·Р°РїСѓС‰РµРЅР°');
+    if (launcher.isRunning(id)) throw new Error('Сначала закройте игру — сборка запущена');
     const instance = instances.readInstance(id);
     if (instance && instance.sharedPack) {
       try {
         await friends.leavePack({ packId: instance.sharedPack });
       } catch {
-        /* РѕР±Р»Р°РєРѕ РЅРµРґРѕСЃС‚СѓРїРЅРѕ вЂ” СѓРґР°Р»СЏРµРј Р»РѕРєР°Р»СЊРЅРѕ */
+        /* облако недоступно — удаляем локально */
       }
     }
     const removed = instances.deleteInstance(id);
@@ -699,7 +704,7 @@ function registerIpc() {
             try {
               gameOptions.write(instance.id, clean);
             } catch {
-              /* СЃР±РѕСЂРєСѓ РјРѕРіР»Рё СѓРґР°Р»РёС‚СЊ вЂ” РїСЂРѕРїСѓСЃРєР°РµРј */
+              /* сборку могли удалить — пропускаем */
             }
           }
         }
@@ -716,12 +721,12 @@ function registerIpc() {
     'instances:export',
     wrap(async ({ id, withSaves }) => {
       const instance = instances.readInstance(id);
-      if (!instance) throw new Error('РЎР±РѕСЂРєР° РЅРµ РЅР°Р№РґРµРЅР°');
+      if (!instance) throw new Error('Сборка не найдена');
       const safeName = String(instance.name).replace(/[\\/:*?"<>|]/g, '-').trim().slice(0, 40) || 'sborka';
       const result = await dialog.showSaveDialog(mainWindow, {
-        title: 'Р­РєСЃРїРѕСЂС‚ СЃР±РѕСЂРєРё',
+        title: 'Экспорт сборки',
         defaultPath: path.join(app.getPath('downloads'), `${safeName}.zip`),
-        filters: [{ name: 'РђСЂС…РёРІ СЃР±РѕСЂРєРё', extensions: ['zip'] }],
+        filters: [{ name: 'Архив сборки', extensions: ['zip'] }],
       });
       if (result.canceled || !result.filePath) return null;
       return instances.exportInstance(id, result.filePath, { withSaves: Boolean(withSaves) });
@@ -731,8 +736,8 @@ function registerIpc() {
     'instances:import',
     wrap(async () => {
       const result = await dialog.showOpenDialog(mainWindow, {
-        title: 'РРјРїРѕСЂС‚ СЃР±РѕСЂРєРё РёР»Рё РјРѕРґРїР°РєР°',
-        filters: [{ name: 'РђСЂС…РёРІ СЃР±РѕСЂРєРё РёР»Рё РјРѕРґРїР°РєР°', extensions: ['zip', 'mrpack'] }],
+        title: 'Импорт сборки или модпака',
+        filters: [{ name: 'Архив сборки или модпака', extensions: ['zip', 'mrpack'] }],
         properties: ['openFile'],
       });
       if (result.canceled || !result.filePaths.length) return null;
@@ -769,7 +774,7 @@ function registerIpc() {
     'game:install',
     wrap(async ({ instanceId }) => {
       const instance = instances.readInstance(instanceId);
-      if (!instance) throw new Error('РЎР±РѕСЂРєР° РЅРµ РЅР°Р№РґРµРЅР°');
+      if (!instance) throw new Error('Сборка не найдена');
       const progress = progressFor(instanceId);
       const versionId = await instances.ensureProfile(instance, progress, { verify: true });
       return { versionId };
@@ -780,7 +785,7 @@ function registerIpc() {
     'game:launch',
     wrap(async ({ instanceId, server }) => {
       const instance = instances.readInstance(instanceId);
-      if (!instance) throw new Error('РЎР±РѕСЂРєР° РЅРµ РЅР°Р№РґРµРЅР°');
+      if (!instance) throw new Error('Сборка не найдена');
       const extraGameArgs = [];
       if (server) {
         const raw = String(server).trim();
@@ -793,13 +798,13 @@ function registerIpc() {
       if (activeIds.length) {
         const active = instances.readInstance(activeIds[0]);
         const activeName = active ? active.name : activeIds[0];
-        const busy = new Error(`РЈР¶Рµ Р·Р°РїСѓС‰РµРЅР° СЃР±РѕСЂРєР° В«${activeName}В». Р—Р°РєСЂРѕР№С‚Рµ РµС‘, С‡С‚РѕР±С‹ РёРіСЂР°С‚СЊ РІ РґСЂСѓРіСѓСЋ.`);
+        const busy = new Error(`Уже запущена сборка «${activeName}». Закройте её, чтобы играть в другую.`);
         busy.code = 'another-running';
         busy.meta = { instanceId: activeIds[0], instanceName: activeName };
         throw busy;
       }
       let account = store.currentAccount();
-      if (!account) throw new Error('РЎРЅР°С‡Р°Р»Р° РІС‹Р±РµСЂРёС‚Рµ Р°РєРєР°СѓРЅС‚ вЂ” РѕС„Р»Р°Р№РЅ, Ely.by РёР»Рё Microsoft');
+      if (!account) throw new Error('Сначала выберите аккаунт — офлайн, Ely.by или Microsoft');
       const authStart = Date.now();
       let offlineMode = false;
       try {
@@ -814,7 +819,7 @@ function registerIpc() {
         offlineMode = true;
         emit('launch:log', {
           instanceId,
-          text: 'РќРµС‚ СЃРІСЏР·Рё СЃ СЃРµСЂРІРµСЂРѕРј РІС…РѕРґР° вЂ” Р·Р°РїСѓСЃРєР°СЋ РЅР° СЃРѕС…СЂР°РЅС‘РЅРЅРѕРј Р°РєРєР°СѓРЅС‚Рµ (РѕС„Р»Р°Р№РЅ).',
+          text: 'Нет связи с сервером входа — запускаю на сохранённом аккаунте (офлайн).',
           stream: 'stderr',
         });
       }
@@ -845,8 +850,8 @@ function registerIpc() {
         if (isNetworkError(error)) {
           const friendly = new Error(
             offlineMode
-              ? 'РќРµС‚ РёРЅС‚РµСЂРЅРµС‚Р°, Р° С‡Р°СЃС‚СЊ С„Р°Р№Р»РѕРІ СЃР±РѕСЂРєРё РµС‰С‘ РЅРµ СЃРєР°С‡Р°РЅР°. РџРѕРґРєР»СЋС‡РёС‚РµСЃСЊ Рє СЃРµС‚Рё РѕРґРёРЅ СЂР°Р·, С‡С‚РѕР±С‹ РґРѕРєР°С‡Р°С‚СЊ С„Р°Р№Р»С‹.'
-              : 'РќРµС‚ СЃРІСЏР·Рё СЃ СЃРµСЂРІРµСЂР°РјРё Minecraft. РџСЂРѕРІРµСЂСЊС‚Рµ РёРЅС‚РµСЂРЅРµС‚ Рё РїРѕРїСЂРѕР±СѓР№С‚Рµ СЃРЅРѕРІР°.',
+              ? 'Нет интернета, а часть файлов сборки ещё не скачана. Подключитесь к сети один раз, чтобы докачать файлы.'
+              : 'Нет связи с серверами Minecraft. Проверьте интернет и попробуйте снова.',
           );
           friendly.code = 'offline';
           throw friendly;
@@ -881,8 +886,8 @@ function registerIpc() {
     wrap(({ logFile }) => {
       const target = path.resolve(String(logFile || ''));
       const logsDir = path.resolve(paths.logs());
-      if (!target.startsWith(logsDir)) throw new Error('Р¤Р°Р№Р» Р»РѕРіР° РІРЅРµ РїР°РїРєРё Р»РѕРіРѕРІ');
-      if (!fs.existsSync(target)) throw new Error('Р¤Р°Р№Р» Р»РѕРіР° РЅРµ РЅР°Р№РґРµРЅ');
+      if (!target.startsWith(logsDir)) throw new Error('Файл лога вне папки логов');
+      if (!fs.existsSync(target)) throw new Error('Файл лога не найден');
       const text = fs.readFileSync(target, 'utf8');
       clipboard.writeText(text.slice(-120000));
       return { chars: Math.min(text.length, 120000) };
@@ -892,7 +897,7 @@ function registerIpc() {
   ipcMain.handle('instances:delete-many', wrap(async ({ ids }) => {
     const list = Array.isArray(ids) ? ids.filter(Boolean) : [];
     for (const id of list) {
-      if (launcher.isRunning(id)) throw new Error('РЎРЅР°С‡Р°Р»Р° Р·Р°РєСЂРѕР№С‚Рµ РёРіСЂСѓ вЂ” РѕРґРЅР° РёР· СЃР±РѕСЂРѕРє Р·Р°РїСѓС‰РµРЅР°');
+      if (launcher.isRunning(id)) throw new Error('Сначала закройте игру — одна из сборок запущена');
     }
     for (const id of list) {
       const instance = instances.readInstance(id);
@@ -900,7 +905,7 @@ function registerIpc() {
         try {
           await friends.leavePack({ packId: instance.sharedPack });
         } catch {
-          /* РѕР±Р»Р°РєРѕ РЅРµРґРѕСЃС‚СѓРїРЅРѕ вЂ” СѓРґР°Р»СЏРµРј Р»РѕРєР°Р»СЊРЅРѕ */
+          /* облако недоступно — удаляем локально */
         }
       }
     }
@@ -971,7 +976,7 @@ function registerIpc() {
     'skins:save',
     wrap(async ({ dataUrl, suggestedName }) => {
       const result = await dialog.showSaveDialog(mainWindow, {
-        title: 'РЎРѕС…СЂР°РЅРёС‚СЊ СЃРєРёРЅ',
+        title: 'Сохранить скин',
         defaultPath: path.join(app.getPath('pictures'), suggestedName || 'skin.png'),
         filters: [{ name: 'PNG', extensions: ['png'] }],
       });
@@ -990,7 +995,7 @@ function registerIpc() {
     'content:curse-install',
     wrap(({ instanceId, modId, projectType }) => {
       const instance = instances.readInstance(instanceId);
-      if (!instance) throw new Error('РЎР±РѕСЂРєР° РЅРµ РЅР°Р№РґРµРЅР°');
+      if (!instance) throw new Error('Сборка не найдена');
       const loader = instance.loader && instance.loader.type !== 'vanilla' ? instance.loader.type : null;
       return curseforge.install(instanceId, modId, {
         projectType,

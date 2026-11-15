@@ -1925,6 +1925,7 @@ input[type="color"] {
 
 .modal-foot {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
   padding: 14px 22px 18px;

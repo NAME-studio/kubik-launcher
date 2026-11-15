@@ -18,6 +18,15 @@ const DEFAULTS = {
   gamma: '0.5',
   soundCategory_master: '1.0',
   pauseOnLostFocus: 'true',
+  onboardAccessibility: 'false',
+  skipMultiplayerWarning: 'true',
+  tutorialStep: 'none',
+};
+
+const ONBOARD_KEYS = {
+  onboardAccessibility: 'false',
+  skipMultiplayerWarning: 'true',
+  tutorialStep: 'none',
 };
 
 function fileFor(instanceId) {
@@ -53,4 +62,23 @@ function write(instanceId, patch) {
   return merged;
 }
 
-module.exports = { DEFAULTS, read, write, fileFor };
+function ensureOnboardingSkipped(instanceId) {
+  const file = fileFor(instanceId);
+  let raw = '';
+  if (exists(file)) {
+    try {
+      raw = fs.readFileSync(file, 'utf8');
+    } catch {
+      raw = '';
+    }
+  }
+  const missing = {};
+  for (const [key, value] of Object.entries(ONBOARD_KEYS)) {
+    const found = new RegExp(`^${key}:(.*)$`, 'm').exec(raw);
+    if (!found || String(found[1]).trim() !== value) missing[key] = value;
+  }
+  if (!raw || Object.keys(missing).length) write(instanceId, missing);
+  return missing;
+}
+
+module.exports = { DEFAULTS, ONBOARD_KEYS, read, write, fileFor, ensureOnboardingSkipped };
