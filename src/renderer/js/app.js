@@ -314,6 +314,7 @@
       UI.toast('Игра запускается…', 'success');
       setTimeout(() => modal.close(), 1200);
     } catch (error) {
+      delete App.state.progress[instance.id];
       modal.close();
       App.showLaunchError(instance, error);
     } finally {
@@ -850,14 +851,15 @@
   }
 
   function bindIpc() {
-    window.api.on('install:progress', (payload) => {
-      App.state.progress[payload.instanceId] = payload;
+    const trackProgress = (payload) => {
+      if (!payload || !payload.instanceId) return;
+      const finished = payload.stage === 'error' || Number(payload.percent) >= 100;
+      if (finished) delete App.state.progress[payload.instanceId];
+      else App.state.progress[payload.instanceId] = payload;
       App.emit('progress', payload);
-    });
-    window.api.on('content:progress', (payload) => {
-      App.state.progress[payload.instanceId] = payload;
-      App.emit('progress', payload);
-    });
+    };
+    window.api.on('install:progress', trackProgress);
+    window.api.on('content:progress', trackProgress);
     window.api.on('modpack:progress', (payload) => App.emit('modpack', payload));
     window.api.on('java:progress', (payload) => App.emit('java', payload));
     window.api.on('friends:update', (payload) => {

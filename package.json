@@ -1,7 +1,7 @@
 {
   "name": "kubik-launcher",
   "productName": "Kubik Launcher",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "Kubik Launcher — лаунчер Minecraft: Ely.by, моды, модпаки, редактор скинов",
   "main": "main.js",
   "author": "Kubik",

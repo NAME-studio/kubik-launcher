@@ -145,6 +145,7 @@ window.Views.home = (() => {
         setProgress({ percent: 100, detail: 'Игра запущена' });
         setTimeout(() => setProgress(null), 2500);
       } catch (error) {
+        delete App.state.progress[instance.id];
         setProgress(null);
         playButton.disabled = false;
         if (App.showLaunchError) App.showLaunchError(instance, error);
@@ -157,8 +158,6 @@ window.Views.home = (() => {
     refs = { hero, playButton, progressBox, setProgress, refreshPlayButton, updateMeta, meta };
     updateMeta();
     refreshPlayButton();
-    const progress = instance ? App.state.progress[instance.id] : null;
-    if (progress) setProgress(progress);
     if (typeof App.on === 'function') {
       refs.offProgress = App.on('progress', (payload) => setProgress(payload || null));
     }

@@ -566,13 +566,26 @@ async function featuredModpacks(limit = 6) {
   return result.hits;
 }
 
+async function mapPool(items, limit, worker) {
+  const results = [];
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length || 1) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await worker(items[index], index);
+    }
+  });
+  await Promise.all(runners);
+  return results;
+}
+
 async function updateProjectCheck(instanceId) {
   const content = readContent(instanceId);
   const instance = instances.readInstance(instanceId);
   if (!instance) return [];
-  const updates = [];
-  for (const item of content.items) {
-    if (item.fromModpack || !item.slug) continue;
+  const candidates = content.items.filter((item) => !item.fromModpack && item.slug);
+  const checked = await mapPool(candidates, 6, async (item) => {
     try {
       const versions = await getVersions(item.projectId, {
         gameVersion: instance.mcVersion,
@@ -580,19 +593,20 @@ async function updateProjectCheck(instanceId) {
       });
       const best = pickVersion(versions);
       if (best && best.id !== item.versionId && compareVersions(best.versionNumber, item.versionNumber) > 0) {
-        updates.push({
+        return {
           projectId: item.projectId,
           title: item.title,
           current: item.versionNumber,
           latest: best.versionNumber,
           versionId: best.id,
-        });
+        };
       }
     } catch {
-      /* ignore */
+      /* мод мог быть удалён с Modrinth — пропускаем */
     }
-  }
-  return updates;
+    return null;
+  });
+  return checked.filter(Boolean);
 }
 
 async function updateAll(instanceId, onProgress) {
