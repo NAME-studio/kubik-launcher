@@ -114,6 +114,7 @@ contextBridge.exposeInMainWorld('api', {
 
   friends: {
     state: () => invoke('friends:state'),
+    diagnose: () => invoke('friends:diagnose'),
     setup: (name, about) => invoke('friends:setup', { name, about }),
     add: (code) => invoke('friends:add', { code }),
     remove: (friendId) => invoke('friends:remove', { friendId }),

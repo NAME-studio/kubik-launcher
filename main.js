@@ -300,10 +300,11 @@ function showWindow() {
 function createWindow() {
   const shotSize = /^[0-9]+x[0-9]+$/.test(process.env.KUBIK_WINDOW || '') ? process.env.KUBIK_WINDOW.split('x').map(Number) : null;
   mainWindow = new BrowserWindow({
-    width: shotSize ? shotSize[0] : 1360,
-    height: shotSize ? shotSize[1] : 860,
-    minWidth: 1080,
-    minHeight: 700,
+    width: shotSize ? shotSize[0] : 1440,
+    height: shotSize ? shotSize[1] : 900,
+    minWidth: 1200,
+    minHeight: 780,
+    center: true,
     show: false,
     frame: false,
     backgroundColor: '#0b0d12',
@@ -327,6 +328,7 @@ function createWindow() {
     const hidden = process.argv.includes('--hidden') && settings.startInTray !== false;
     if (!hidden) mainWindow.show();
     updater.init(mainWindow);
+    setTimeout(() => { modrinth.warmCatalog(); mojang.warmManifest(); }, 1500);
     setTimeout(() => {
       updater.promptOnStart(mainWindow).catch(() => {});
     }, 2500);
@@ -340,7 +342,7 @@ function createWindow() {
   mainWindow.on('close', (event) => {
     if (quitting) return;
     const settings = store.getSettings();
-    const keep = settings.closeToTray !== false || (settings.hideOnClose !== false && launcher.running.size > 0);
+    const keep = (settings.closeToTray === true && tray) || (settings.hideOnClose === true && launcher.running.size > 0);
     if (keep) {
       event.preventDefault();
       mainWindow.hide();
@@ -475,6 +477,7 @@ function registerIpc() {
   ipcMain.handle('update:notes', wrap(({ version }) => updater.notes(version)));
 
   ipcMain.handle('friends:state', wrap(() => friends.state()));
+  ipcMain.handle('friends:diagnose', wrap(() => friends.diagnose()));
   ipcMain.handle('friends:setup', wrap(({ name, about }) => friends.setup({ name, about })));
   ipcMain.handle('friends:add', wrap(({ code }) => friends.addFriend(code)));
   ipcMain.handle('friends:remove', wrap(({ friendId }) => friends.removeFriend(friendId)));
@@ -1124,13 +1127,44 @@ app.whenReady().then(() => {
   }, 2500);
 });
 
+// одна копия лаунчера: второй запуск поднимает уже открытое окно
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+app.on('second-instance', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+});
+
+app.on('will-quit', () => {
+  try {
+    if (tray) {
+      tray.destroy();
+      tray = null;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    rpc.stop();
+  } catch {
+    /* ignore */
+  }
+});
+
 app.on('before-quit', () => {
   quitting = true;
 });
 
 app.on('window-all-closed', () => {
   if (process.platform === 'darwin') return;
-  if (store.getSettings().closeToTray !== false) return;
+  if (store.getSettings().closeToTray === true) return;
   quitting = true;
   app.quit();
 });

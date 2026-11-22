@@ -9,11 +9,11 @@ const { ensureDir } = require('./util');
 const DEFAULT_SETTINGS = {
   memoryMB: 4096,
   javaPath: '',
-  jvmArgs: '-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200',
+  jvmArgs: '-XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1',
   gameArgs: '',
   closeOnLaunch: false,
   minimizeOnLaunch: true,
-  closeToTray: true,
+  closeToTray: false,
   startInTray: false,
   autoStart: false,
   showConsole: false,
@@ -77,8 +77,11 @@ function writeJson(file, data) {
 function load() {
   const rawSettings = readJson(paths.configFile(), {});
   settings = { ...DEFAULT_SETTINGS, ...secrets.revealSettings(rawSettings) };
-  // Пустые значения из старого конфига не должны затирать ключи по умолчанию.
-  if (!settings.firebaseApiKey) settings.firebaseApiKey = DEFAULT_SETTINGS.firebaseApiKey;
+  // Пустые и битые значения из старого конфига не должны затирать ключи по умолчанию:
+  // друзья должны работать сразу после установки, без ручной настройки.
+  if (!/^AIza[0-9A-Za-z_-]{20,}$/.test(String(settings.firebaseApiKey || ''))) {
+    settings.firebaseApiKey = DEFAULT_SETTINGS.firebaseApiKey;
+  }
   if (!settings.firebaseProjectId) settings.firebaseProjectId = DEFAULT_SETTINGS.firebaseProjectId;
   if (settings.resolution && typeof settings.resolution === 'object') {
     settings.resolution = { ...DEFAULT_SETTINGS.resolution, ...settings.resolution };

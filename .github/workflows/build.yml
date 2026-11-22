@@ -88,3 +88,61 @@ jobs:
           foreach ($asset in $assets) {
             gh release upload $tag $asset --clobber
           }
+
+      - name: VirusTotal report and site link
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          if (-not $env:VT_API_KEY) {
+            Write-Host "Секрет VT_API_KEY не задан — отчёт VirusTotal пропущен."
+            exit 0
+          }
+          $version = "${{ steps.version.outputs.value }}"
+          $setup = "release/KubikLauncher-Setup-$version.exe"
+          $sha = (Get-FileHash -Algorithm SHA256 -LiteralPath $setup).Hash.ToLower()
+          Write-Host "Отправляю $setup в VirusTotal ($sha)"
+
+          $upload = curl.exe -sS --request POST `
+            --url https://www.virustotal.com/api/v3/files `
+            --header "x-apikey: $env:VT_API_KEY" `
+            --form "file=@$setup" | ConvertFrom-Json
+          $analysisId = $upload.data.id
+          if (-not $analysisId) {
+            Write-Host "VirusTotal не вернул id анализа, шаг пропущен."
+            exit 0
+          }
+
+          $status = ""
+          for ($i = 0; $i -lt 30; $i++) {
+            Start-Sleep -Seconds 20
+            $report = curl.exe -sS --url "https://www.virustotal.com/api/v3/analyses/$analysisId" `
+              --header "x-apikey: $env:VT_API_KEY" | ConvertFrom-Json
+            $status = $report.data.attributes.status
+            Write-Host "попытка $($i + 1): статус $status"
+            if ($status -eq "completed") { break }
+          }
+          if ($status -ne "completed") {
+            Write-Host "VirusTotal не успел закончить анализ — ссылку не трогаю."
+            exit 0
+          }
+
+          $stats = $report.data.attributes.stats
+          Write-Host "Обнаружений: $($stats.malicious) из $($stats.malicious + $stats.undetected)"
+
+          $link = "https://www.virustotal.com/gui/file/$sha"
+          $docs = "docs/index.html"
+          $html = Get-Content -LiteralPath $docs -Raw
+          $updated = [regex]::Replace($html, 'https://www\.virustotal\.com/gui/file/[0-9a-fA-F]{64}', $link)
+          if ($updated -ne $html) {
+            Set-Content -LiteralPath $docs -Value $updated -Encoding UTF8 -NoNewline
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add $docs
+            git commit -m "docs: отчёт VirusTotal для $version"
+            git push
+            Write-Host "Сайт обновлён: $link"
+          } else {
+            Write-Host "Ссылка уже указывает на $sha"
+          }

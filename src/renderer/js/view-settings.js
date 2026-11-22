@@ -4,10 +4,25 @@ window.Views = window.Views || {};
 
 window.Views.settings = (() => {
   let unsubscribers = [];
+  let lastTab = 'game';
 
   const SITE_URL = 'https://name-studio.github.io/kubik-launcher/';
   const GITHUB_URL = 'https://github.com/NAME-studio/kubik-launcher';
-  const BUGS_URL = `${GITHUB_URL}/issues/new?template=bug_report.yml`;
+  function bugReportUrl() {
+  const info = App.state.info || {};
+  const title = `Ошибка в ${info.version || 'лаунчере'}`;
+  const body = [
+    '**Что произошло**',
+    '',
+    '**Как повторить**',
+    '',
+    '**Ожидалось**',
+    '',
+    `Версия: ${info.version || '—'}`,
+    `Платформа: ${info.platform || '—'}`,
+  ].join('\n');
+  return `${GITHUB_URL}/issues/new?template=bug_report.yml&title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+}
   const DISCORD_URL = 'https://discord.gg/VCemrH6M44';
 
   async function save(patch) {
@@ -53,7 +68,7 @@ window.Views.settings = (() => {
         UI.el('button', { class: 'btn sm', onclick: () => window.api.openExternal(SITE_URL) }, 'Сайт'),
         UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(GITHUB_URL) }, 'GitHub'),
         UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(DISCORD_URL) }, 'Discord'),
-        UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(BUGS_URL) }, 'Сообщить о баге'),
+        UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openExternal(bugReportUrl()) }, 'Сообщить о баге'),
         UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openPath(info.configDir || info.root) }, UI.icon('folder'), 'Логи и конфиг'),
       ),
     );
@@ -96,11 +111,11 @@ window.Views.settings = (() => {
     const max = Math.max(8192, Math.round((App.state.info.totalMemory || 8e9) / 1048576));
     const badge = UI.el('span', { class: 'badge accent', text: `${value} МБ` });
     const slider = UI.el('input', { class: 'slider', type: 'range', min: '1024', max: String(max), step: '512', value: String(value) });
-    const fill = () => `${((Number(slider.value) - 1024) / (max - 1024)) * 100}%`;
-    slider.style.setProperty('--fill', fill());
+    const ratio = () => (Number(slider.value) - 1024) / (max - 1024);
+    slider.style.setProperty('--ratio', String(ratio()));
     slider.addEventListener('input', () => {
       badge.textContent = `${slider.value} МБ`;
-      slider.style.setProperty('--fill', fill());
+      slider.style.setProperty('--ratio', String(ratio()));
     });
     slider.addEventListener('change', () => onInput(Number(slider.value)));
     return UI.el('div', { class: 'field' }, UI.el('div', { class: 'row between' }, UI.el('label', {}, 'Память по умолчанию'), badge), slider);
@@ -109,10 +124,10 @@ window.Views.settings = (() => {
   function sliderRow(title, min, max, step, value, suffix, onChange) {
     const badge = UI.el('span', { class: 'badge accent', text: `${value}${suffix || ''}` });
     const slider = UI.el('input', { class: 'slider', type: 'range', min: String(min), max: String(max), step: String(step), value: String(value) });
-    slider.style.setProperty('--fill', `${((value - min) / (max - min)) * 100}%`);
+    slider.style.setProperty('--ratio', String((value - min) / (max - min)));
     slider.addEventListener('input', () => {
       badge.textContent = `${slider.value}${suffix || ''}`;
-      slider.style.setProperty('--fill', `${((Number(slider.value) - min) / (max - min)) * 100}%`);
+      slider.style.setProperty('--ratio', String((Number(slider.value) - min) / (max - min)));
     });
     slider.addEventListener('change', () => onChange(Number(slider.value)));
     return UI.el('div', { class: 'field' }, UI.el('div', { class: 'row between' }, UI.el('label', {}, title), badge), slider);
@@ -266,25 +281,39 @@ window.Views.settings = (() => {
   function cloudCard() {
     const card = UI.el('div', { class: 'card pad' });
     card.append(UI.el('div', { class: 'card-head' }, UI.el('div', { class: 'card-title' }, UI.icon('users'), 'Облако друзей')));
-    const project = UI.el('input', {
-      class: 'input',
-      placeholder: 'projectId, например kubik-launcher',
-      value: App.state.settings.firebaseProjectId || '',
-      onchange: (event) => save({ firebaseProjectId: event.target.value.trim() }),
+
+    const lines = UI.el('div', { class: 'setting-block' });
+    const hint = UI.el('p', {
+      class: 'tiny muted',
+      text: 'Настраивать ничего не нужно: друзья и общие сборки работают сразу. Откройте раздел «Друзья», скопируйте свой код и отправьте другу — он введёт его у себя и всё.',
     });
-    const key = UI.el('input', {
-      class: 'input',
-      placeholder: 'apiKey из конфига Firebase',
-      value: App.state.settings.firebaseApiKey || '',
-      onchange: (event) => save({ firebaseApiKey: event.target.value.trim() }),
+
+    const button = UI.el('button', { class: 'btn sm ghost' }, 'Проверить подключение');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      button.textContent = 'Проверяю…';
+      lines.replaceChildren();
+      try {
+        const res = await window.api.friends.diagnose();
+        if (!res || !res.ok) {
+          lines.append(UI.el('p', { class: 'tiny', text: 'Ошибка: ' + ((res && res.error) || 'облако не ответило') }));
+        } else {
+          const data = res.data || {};
+          for (const step of data.steps || []) {
+            const row = UI.el('p', { class: 'tiny', text: (step.ok ? '✓ ' : '✗ ') + step.name + ': ' + step.text });
+            if (!step.ok) row.style.color = 'var(--danger, #e05252)';
+            lines.append(row);
+          }
+          if (data.code) lines.append(UI.el('p', { class: 'tiny muted', text: 'Ваш код: ' + data.code }));
+        }
+      } catch (error) {
+        lines.append(UI.el('p', { class: 'tiny', text: 'Ошибка: ' + ((error && error.message) || 'неизвестно') }));
+      }
+      button.disabled = false;
+      button.textContent = 'Проверить подключение';
     });
-    card.append(
-      UI.el('div', { class: 'setting-block' },
-        UI.el('div', { class: 'field' }, UI.el('label', {}, 'Project ID'), project),
-        UI.el('div', { class: 'field' }, UI.el('label', {}, 'API key'), key),
-        UI.el('p', { class: 'tiny muted' }, 'Друзья и общие сборки работают через Firebase. Ключи хранятся только на этом ПК, в исходный код не вшиваются. Взять их: console.firebase.google.com → Project settings → Your apps → Web app.'),
-      ),
-    );
+
+    card.append(lines, hint, button);
     return card;
   }
 
@@ -384,6 +413,10 @@ window.Views.settings = (() => {
         latest: 'У вас последняя версия',
         error: current.error || 'Не удалось проверить обновления',
       };
+      const rawError = String(current.error || '');
+      if (/app-update\.yml|ENOENT/i.test(rawError)) {
+        labels.error = 'Обновления недоступны в этой сборке: нет файла app-update.yml. Скачайте новый Setup с GitHub — автообновление работает только у установленной версии.';
+      }
       status.textContent = current.supported ? labels[current.status] || '' : current.reason;
 
       actions.replaceChildren();
@@ -415,6 +448,12 @@ window.Views.settings = (() => {
     };
 
     card.append(
+      UI.el('div', { class: 'divider' }),
+      UI.el('div', {},
+        UI.el('div', { class: 'kv' }, UI.el('span', {}, 'Текущая версия'), UI.el('span', {}, App.state.info.version)),
+        UI.el('div', { class: 'kv' }, UI.el('span', {}, 'Источник'), UI.el('span', {}, 'GitHub releases')),
+        UI.el('div', { class: 'kv' }, UI.el('span', {}, 'Тип установки'), UI.el('span', {}, 'portable / installed')),
+      ),
       status,
       bar,
       actions,
@@ -549,7 +588,7 @@ window.Views.settings = (() => {
         UI.el('div', { class: 'field' },
           UI.el('label', {}, 'Тема'),
           UI.el('div', { class: 'tabs mini' },
-            ...[['dark', 'Тёмная'], ['light', 'Светлая']].map(([id, label]) => {
+            ...[['dark', 'Тёмная'], ['light', 'Светлая'], ['neon', 'Неон']].map(([id, label]) => {
               const tab = UI.el('button', { class: `tab${(App.state.settings.theme || 'dark') === id ? ' active' : ''}`, text: label });
               tab.addEventListener('click', async () => {
                 await save({ theme: id });
@@ -586,6 +625,87 @@ window.Views.settings = (() => {
           ),
         ),
       ),
+    );
+    return card;
+  }
+
+  function diagnoseCard() {
+    const info = App.state.info;
+    const logsDir = `${String(info.root || '').replace(/[\\/]+$/, '')}\\logs`;
+    const card = UI.el('div', { class: 'card pad' });
+    card.append(UI.el('div', { class: 'card-head' }, UI.el('div', { class: 'card-title' }, UI.icon('info'), 'Диагностика')));
+
+    const copySummary = () => {
+      const text = [
+        `Kubik Launcher ${info.version}`,
+        `Electron ${info.electron}, Chromium ${info.chrome}, Node ${info.node}`,
+        `Папка: ${info.root}`,
+        `Ядер CPU: ${info.cpuCount}, память ПК: ${UI.bytes(info.totalMemory)}`,
+      ].join('\n');
+      const done = () => UI.toast('Сведения скопированы', 'success');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(done);
+        return;
+      }
+      const area = UI.el('textarea', { style: { position: 'fixed', opacity: '0' } });
+      area.value = text;
+      document.body.append(area);
+      area.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      area.remove();
+      done();
+    };
+
+    card.append(
+      UI.el('div', { class: 'kv' }, UI.el('span', {}, 'Electron'), UI.el('span', {}, info.electron)),
+      UI.el('div', { class: 'kv' }, UI.el('span', {}, 'Память ПК'), UI.el('span', {}, UI.bytes(info.totalMemory))),
+      UI.el('div', { class: 'kv' }, UI.el('span', {}, 'Ядер CPU'), UI.el('span', {}, String(info.cpuCount))),
+      UI.el('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap', marginTop: '10px' } },
+        UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openPath(info.root) }, UI.icon('folder'), 'Папка лаунчера'),
+        UI.el('button', { class: 'btn sm ghost', onclick: () => window.api.openPath(logsDir) }, UI.icon('file'), 'Логи'),
+        UI.el('button', { class: 'btn sm ghost', onclick: copySummary }, UI.icon('check'), 'Скопировать сведения'),
+      ),
+    );
+    return card;
+  }
+
+  function perfPresetCard() {
+    const settings = App.state.settings;
+    const card = UI.el('div', { class: 'card pad' });
+    card.append(
+      UI.el('div', { class: 'card-head' },
+        UI.el('div', { class: 'card-title' }, UI.icon('cpu'), 'Пресеты памяти'),
+        UI.el('span', { class: 'badge', text: 'быстрый выбор' }),
+      ),
+    );
+    const presets = [
+      { label: 'Слабый ПК', memory: 3072, threads: 8, note: '3 ГБ · 8 потоков' },
+      { label: 'Обычный', memory: 6144, threads: 16, note: '6 ГБ · 16 потоков' },
+      { label: 'Максимум', memory: 8192, threads: 24, note: '8 ГБ · 24 потока' },
+    ];
+    const row = UI.el('div', { class: 'row', style: { gap: '8px', flexWrap: 'wrap' } });
+    for (const preset of presets) {
+      const button = UI.el('button', {
+        class: `btn sm${settings.memoryMB === preset.memory ? '' : ' ghost'}`,
+        title: preset.note,
+        onclick: async () => {
+          button.disabled = true;
+          try {
+            await save({ memoryMB: preset.memory, downloadThreads: preset.threads });
+            UI.toast(`Пресет «${preset.label}»: ${preset.note}`, 'success');
+          } catch (error) {
+            UI.toast(error.message, 'error');
+          } finally {
+            button.disabled = false;
+          }
+        },
+      }, preset.label);
+      row.append(button);
+    }
+    card.append(
+      row,
+      UI.el('p', { class: 'tiny muted', style: { margin: '10px 0 0' } },
+        'Одна кнопка ставит память и число потоков загрузки. Аргументы JVM можно вписать ниже, если нужны свои.'),
     );
     return card;
   }
@@ -671,18 +791,84 @@ window.Views.settings = (() => {
         ),
       );
 
-      const cols = UI.el('div', { class: 'settings-cols' },
-        accountCard(),
-        filesCard(),
-        performance,
-        launcher,
-        updateCard(),
-        javaCard(),
-        appearanceCard(),
-        cloudCard(),
-        discordCard(),
-      );
-      container.append(cols, UI.el('div', { class: 'settings-about' }, about));
+      const groups = [
+        {
+          id: 'game',
+          label: 'Игра',
+          icon: 'play',
+          cards: [
+            { node: performance, weight: 6 },
+            { node: javaCard(), weight: 4 },
+            { node: perfPresetCard(), weight: 2 },
+          ],
+        },
+        {
+          id: 'launcher',
+          label: 'Лаунчер',
+          icon: 'settings',
+          cards: [
+            { node: launcher, weight: 7 },
+            { node: updateCard(), weight: 4 },
+            { node: filesCard(), weight: 4 },
+            { node: appearanceCard(), weight: 4 },
+            { node: diagnoseCard(), weight: 3 },
+          ],
+        },
+        {
+          id: 'account',
+          label: 'Аккаунт',
+          icon: 'user',
+          cards: [
+            { node: accountCard(), weight: 5 },
+            { node: cloudCard(), weight: 3 },
+            { node: discordCard(), weight: 3 },
+          ],
+        },
+        {
+          id: 'about',
+          label: 'О лаунчере',
+          icon: 'info',
+          cards: [{ node: about, weight: 5 }],
+        },
+      ];
+      const panes = new Map();
+      const tabs = UI.el('div', { class: 'settings-tabs' });
+      for (const group of groups) {
+        const single = group.cards.length < 2;
+        const left = UI.el('div', { class: 'settings-col' });
+        const right = single ? null : UI.el('div', { class: 'settings-col' });
+        let leftWeight = 0;
+        let rightWeight = 0;
+        for (const card of group.cards) {
+          if (single || leftWeight <= rightWeight) {
+            left.append(card.node);
+            leftWeight += card.weight;
+          } else {
+            right.append(card.node);
+            rightWeight += card.weight;
+          }
+        }
+        const pane = single
+          ? UI.el('div', { class: 'settings-cols single' }, left)
+          : UI.el('div', { class: 'settings-cols' }, left, right);
+        panes.set(group.id, pane);
+        const button = UI.el('button', {
+          class: 'settings-tab',
+          type: 'button',
+          dataset: { tab: group.id },
+          onclick: () => {
+            lastTab = group.id;
+            for (const [id, node] of panes) node.classList.toggle('hidden', id !== group.id);
+            for (const node of tabs.children) node.classList.toggle('on', node.dataset.tab === group.id);
+          },
+        }, UI.icon(group.icon), UI.el('span', { text: group.label }));
+        tabs.append(button);
+      }
+      const initial = panes.has(lastTab) ? lastTab : 'game';
+      for (const [id, node] of panes) node.classList.toggle('hidden', id !== initial);
+      for (const node of tabs.children) node.classList.toggle('on', node.dataset.tab === initial);
+
+      container.append(tabs, ...panes.values());
     },
     destroy() {
       unsubscribers.forEach((fn) => fn && fn());

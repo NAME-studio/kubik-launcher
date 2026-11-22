@@ -12,7 +12,26 @@ window.Views.friends = (() => {
     refs: {},
     busy: false,
     query: '',
+    filter: 'all',
+    pane: 'friends',
   };
+
+  function plural(n, one, few, many) {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return one;
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+    return many;
+  }
+
+  function counters() {
+    const list = (state.data && state.data.friends) || [];
+    return {
+      total: list.length,
+      online: list.filter((friend) => friend.online).length,
+      unread: list.reduce((sum, friend) => sum + (friend.unread || 0), 0),
+    };
+  }
 
   function clock(at) {
     if (!at) return '';
@@ -66,9 +85,11 @@ window.Views.friends = (() => {
   function sortedFriends() {
     const list = (state.data && state.data.friends) || [];
     const query = state.query.trim().toLowerCase();
-    const filtered = query
+    let filtered = query
       ? list.filter((friend) => String(friend.name || '').toLowerCase().includes(query))
       : list.slice();
+    if (state.filter === 'online') filtered = filtered.filter((friend) => friend.online);
+    else if (state.filter === 'unread') filtered = filtered.filter((friend) => friend.unread);
     const pinned = pinnedIds();
     return filtered.sort((a, b) => {
       const pa = pinned.indexOf(a.id);
@@ -262,22 +283,96 @@ window.Views.friends = (() => {
     return row;
   }
 
+  function renderTabs() {
+    const host = state.refs.filters;
+    if (!host) return;
+    UI.clear(host);
+    const info = counters();
+    const items = [
+      { id: 'all', label: 'Все', badge: info.total },
+      { id: 'online', label: 'В сети', badge: info.online },
+      { id: 'unread', label: 'Новые', badge: info.unread },
+    ];
+    for (const item of items) {
+      const badge = UI.el('span', { class: 'friends-filter-badge', text: String(item.badge || 0) });
+      if (!item.badge) badge.classList.add('hidden');
+      const button = UI.el('button', {
+        class: `friends-filter${state.filter === item.id ? ' on' : ''}`,
+        type: 'button',
+        onclick: () => {
+          state.filter = item.id;
+          renderTabs();
+          renderList();
+        },
+      }, UI.el('span', { text: item.label }), badge);
+      if (item.id === 'unread') state.refs.unreadBadge = badge;
+      host.append(button);
+    }
+  }
+
+  function updateCounters() {
+    const refs = state.refs;
+    if (!refs.countTotal || !state.data) return;
+    const info = counters();
+    refs.countTotal.textContent = `${info.total} ${plural(info.total, 'друг', 'друга', 'друзей')}`;
+    refs.countOnline.textContent = info.online ? `${info.online} в сети` : 'никого в сети';
+    refs.countOnline.classList.toggle('live', info.online > 0);
+    if (refs.unreadBadge) {
+      refs.unreadBadge.textContent = String(info.unread);
+      refs.unreadBadge.classList.toggle('hidden', !info.unread);
+    }
+  }
+
+  function emptyState(kind) {
+    if (kind === 'filtered') {
+      const hint =
+        state.filter === 'online'
+          ? 'Сейчас никто из друзей не играет.'
+          : state.filter === 'unread'
+            ? 'Непрочитанных сообщений нет.'
+            : `Никого не нашли по запросу «${state.query.trim()}».`;
+      return UI.el('div', { class: 'friends-empty soft' },
+        UI.el('div', { class: 'friends-empty-icon' }, UI.icon(state.filter === 'online' ? 'users' : 'search')),
+        UI.el('p', { text: hint }),
+        UI.el('button', {
+          class: 'btn sm ghost',
+          onclick: () => {
+            state.filter = 'all';
+            state.query = '';
+            if (state.refs.search) state.refs.search.value = '';
+            renderList();
+            renderTabs();
+          },
+        }, 'Показать всех'),
+      );
+    }
+    const me = (state.data && state.data.me) || {};
+    return UI.el('div', { class: 'friends-empty' },
+      UI.el('div', { class: 'friends-empty-icon' }, UI.icon('users')),
+      UI.el('p', { class: 'friends-empty-title', text: 'Пока никого нет' }),
+      UI.el('p', { class: 'tiny muted' },
+        me.code
+          ? 'Скопируйте свой код ниже и отправьте другу — он добавит вас. Его код введите в поле «Код друга».'
+          : 'Включите друзей, чтобы получить свой код и обмениваться им.'),
+      me.code
+        ? UI.el('button', { class: 'btn sm', onclick: () => copy(me.code, 'Код скопирован') }, UI.icon('file'), 'Скопировать код')
+        : null,
+    );
+  }
+
   function renderList() {
     const host = state.refs.list;
     if (!host || !state.data) return;
     UI.clear(host);
+    renderTabs();
+    updateCounters();
     if (!state.data.friends.length) {
-      host.append(UI.el('div', { class: 'friends-empty' },
-        UI.el('p', { class: 'tiny muted' }, 'Список пуст.'),
-        UI.el('p', { class: 'tiny muted' }, 'Передайте другу ваш код выше — он добавит вас, а вы его код введите в поле «Код друга».'),
-      ));
+      host.append(emptyState('empty'));
       return;
     }
     const rows = sortedFriends();
     if (!rows.length) {
-      host.append(UI.el('div', { class: 'friends-empty' },
-        UI.el('p', { class: 'tiny muted' }, `Никого не нашли по запросу «${state.query.trim()}».`),
-      ));
+      host.append(emptyState('filtered'));
       return;
     }
     for (const friend of rows) host.append(friendRow(friend));
@@ -521,7 +616,7 @@ window.Views.friends = (() => {
     const list = UI.el('div', { class: 'friends-list' });
     const packs = UI.el('div', { class: 'friends-packs' });
     const messages = UI.el('div', { class: 'chat-messages' });
-    const title = UI.el('div', { class: 'card-title', text: 'Выберите друга' });
+    const title = UI.el('div', { class: 'friends-chat-name', text: 'Выберите друга' });
     const status = UI.el('div', { class: 'friend-status', text: '' });
     const input = UI.el('input', { class: 'input', placeholder: 'Сообщение…' });
     const sendBtn = UI.el('button', { class: 'btn primary icon-only', title: 'Отправить', onclick: () => sendMessage() }, UI.icon('send'));
@@ -552,15 +647,43 @@ window.Views.friends = (() => {
       }
     });
 
-    state.refs = { list, packs, messages, title, status, input, search };
+    const countTotal = UI.el('span', { class: 'friends-count', text: '0 друзей' });
+    const countOnline = UI.el('span', { class: 'friends-count', text: 'никого в сети' });
+    const filters = UI.el('div', { class: 'friends-filters' });
 
+    const paneList = UI.el('div', { class: 'friends-pane' }, search, filters, list);
+    const panePacks = UI.el('div', { class: 'friends-pane hidden' },
+      packs,
+      UI.el('div', { class: 'friends-hint' }, 'Общая сборка одна у вас и у друга: добавил мод — он появился у обоих.'),
+    );
+
+    const seg = UI.el('div', { class: 'friends-seg' });
+    const segButtons = {};
+    const switchPane = (id) => {
+      state.pane = id;
+      paneList.classList.toggle('hidden', id !== 'friends');
+      panePacks.classList.toggle('hidden', id !== 'packs');
+      for (const [key, node] of Object.entries(segButtons)) node.classList.toggle('on', key === id);
+      if (id === 'packs') renderPacks();
+    };
+    for (const [id, label] of [['friends', 'Друзья'], ['packs', 'Общие сборки']]) {
+      const button = UI.el('button', { class: 'friends-seg-btn', type: 'button', onclick: () => switchPane(id) }, label);
+      if ((state.pane || 'friends') === id) button.classList.add('on');
+      segButtons[id] = button;
+      seg.append(button);
+    }
+
+    state.refs = { list, packs, messages, title, status, input, search, countTotal, countOnline, filters, paneList, panePacks, seg };
+
+    const chatAvatar = UI.el('div', { class: 'friends-chat-avatar' }, UI.icon('users'));
     const chat = UI.el('div', { class: 'card friends-chat' },
       UI.el('div', { class: 'friends-chat-head' },
+        chatAvatar,
         UI.el('div', { class: 'friends-chat-who' }, title, status),
         UI.el('div', { class: 'row friends-head-actions' },
-          UI.el('button', { class: 'btn sm ghost', onclick: () => friendProfileDialog(state.selected) }, UI.icon('user'), 'Профиль'),
-          UI.el('button', { class: 'btn sm ghost', onclick: () => sharePackDialog(state.selected) }, UI.icon('package'), 'Сборка'),
-          UI.el('button', { class: 'btn sm ghost', onclick: () => inviteDialog(state.selected) }, UI.icon('server'), 'В игру'),
+          UI.el('button', { class: 'btn sm ghost icon-only', title: 'Профиль друга', onclick: () => friendProfileDialog(state.selected) }, UI.icon('user')),
+          UI.el('button', { class: 'btn sm ghost icon-only', title: 'Поделиться сборкой', onclick: () => sharePackDialog(state.selected) }, UI.icon('package')),
+          UI.el('button', { class: 'btn sm ghost icon-only', title: 'Пригласить в игру', onclick: () => inviteDialog(state.selected) }, UI.icon('server')),
           UI.el('button', { class: 'btn sm ghost icon-only', title: 'Очистить чат', onclick: () => clearChatDialog(state.selected) }, UI.icon('trash')),
         ),
       ),
@@ -569,27 +692,22 @@ window.Views.friends = (() => {
     );
 
     const side = UI.el('div', { class: 'card friends-side' },
-      UI.el('div', { class: 'card-head' },
-        UI.el('div', { class: 'card-title' }, UI.icon('users'), 'Друзья'),
+      UI.el('div', { class: 'friends-side-head' },
+        UI.el('div', { class: 'friends-side-title' }, 'Друзья'),
         UI.el('button', { class: 'btn sm ghost icon-only', title: 'Обновить', onclick: () => refresh() }, UI.icon('refresh')),
-      ),
-      meCard(),
-      addFriendForm(),
-      search,
-      list,
-    );
-
-    const packsCard = UI.el('div', { class: 'card friends-packs-card' },
-      UI.el('div', { class: 'card-head' },
-        UI.el('div', { class: 'card-title' }, UI.icon('package'), 'Общие сборки'),
         UI.el('button', { class: 'btn sm ghost icon-only', title: 'Создать общую сборку', onclick: () => createSharedDialog() }, UI.icon('plus')),
       ),
-      packs,
-      UI.el('div', { class: 'notice compact' }, UI.icon('info'),
-        UI.el('span', {}, 'Общая сборка одна у вас и у друга: кто добавит мод — он появится у обоих.')),
+      UI.el('div', { class: 'friends-counters' }, countTotal, countOnline),
+      seg,
+      meCard(),
+      addFriendForm(),
+      paneList,
+      panePacks,
     );
 
-    const layout = UI.el('div', { class: 'friends-layout' }, side, chat, packsCard);
+    if (state.pane === 'packs') switchPane('packs');
+
+    const layout = UI.el('div', { class: 'friends-layout' }, side, chat);
     state.refs.layout = layout;
     return layout;
   }

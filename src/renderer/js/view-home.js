@@ -13,6 +13,46 @@ window.Views.home = (() => {
     return parts.join(' • ');
   }
 
+  function formatPlaytime(seconds) {
+    const total = Math.max(0, Math.round(Number(seconds) || 0));
+    if (!total) return '0 мин';
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.round((total % 3600) / 60);
+    if (hours && minutes) return `${hours} ч ${minutes} мин`;
+    if (hours) return `${hours} ч`;
+    return `${minutes} мин`;
+  }
+
+  function pickInstanceDialog() {
+    const list = App.state.instances || [];
+    if (list.length < 2) {
+      App.go('instances');
+      return;
+    }
+    const select = UI.el('select', { class: 'select' });
+    for (const item of list) {
+      const option = UI.el('option', { value: item.id, text: `${item.name} • ${item.mcVersion}` });
+      if (item.id === App.state.selectedInstanceId) option.selected = true;
+      select.append(option);
+    }
+    UI.modal({
+      title: 'Сменить сборку',
+      subtitle: 'Выбранная сборка показывается на главной, её и запустит кнопка «Играть»',
+      body: UI.el('div', { class: 'field' }, UI.el('label', {}, 'Сборка'), select),
+      actions: [
+        { label: 'Отмена', kind: 'ghost' },
+        {
+          label: 'Выбрать',
+          kind: 'primary',
+          onClick: () => {
+            App.setInstance(select.value);
+            App.refresh();
+          },
+        },
+      ],
+    });
+  }
+
   function renderHero() {
     const instance = App.instance();
 
@@ -29,7 +69,27 @@ window.Views.home = (() => {
 
     const progressBox = UI.el('div', { class: 'hidden', style: { width: '100%', maxWidth: '440px' } });
     const actions = UI.el('div', { class: 'hero-actions' }, playButton, secondary);
+    if (App.state.instances.length > 1) {
+      actions.append(
+        UI.el('button', { class: 'btn lg ghost', title: 'Показать другую сборку на главной', onclick: () => pickInstanceDialog() },
+          UI.icon('layers'), 'Сменить сборку'),
+      );
+    }
     const meta = UI.el('div', { class: 'hero-meta' });
+
+    const friendsInfo = { loaded: false, total: 0, online: 0 };
+    (async () => {
+      try {
+        const data = await UI.req(window.api.friends.list());
+        const list = (data && data.friends) || [];
+        friendsInfo.total = list.length;
+        friendsInfo.online = list.filter((friend) => friend.online).length;
+        friendsInfo.loaded = true;
+        updateMeta();
+      } catch {
+        friendsInfo.loaded = false;
+      }
+    })();
 
     const hero = UI.el(
       'div',
@@ -65,8 +125,17 @@ window.Views.home = (() => {
         UI.el('span', {}, UI.icon('cube'), `Minecraft ${instance.mcVersion}`),
         UI.el('span', {}, UI.icon('layers'), App.loaderLabel(instance.loader) || 'Vanilla'),
         UI.el('span', {}, UI.icon('cpu'), `${instance.memoryMB} МБ RAM`),
+        UI.el('span', {}, UI.icon('clock'), `Наиграно ${formatPlaytime(instance.playSeconds)}`),
         UI.el('span', {}, UI.icon('folder'), instance.lastPlayed ? `Запуск: ${UI.ago(instance.lastPlayed)}` : 'Ещё не запускалась'),
       );
+      if (friendsInfo.loaded) {
+        meta.append(
+          UI.el('span', { class: friendsInfo.online ? 'live' : '' }, UI.icon('users'),
+            friendsInfo.online
+              ? `${friendsInfo.online} в сети`
+              : `${friendsInfo.total} ${friendsInfo.total === 1 ? 'друг' : 'друзей'}`),
+        );
+      }
     }
 
     function setProgress(payload) {

@@ -29,7 +29,7 @@ let manifestTime = 0;
 const versionCache = new Map();
 
 async function getManifest(force = false) {
-  if (manifestCache && !force && Date.now() - manifestTime < 10 * 60 * 1000) return manifestCache;
+  if (manifestCache && !force && Date.now() - manifestTime < 6 * 60 * 60 * 1000) return manifestCache;
   const cacheFile = path.join(paths.cache(), 'version_manifest_v2.json');
   const readCache = () => {
     try {
@@ -68,7 +68,7 @@ async function getManifest(force = false) {
   if (!force && exists(cacheFile)) {
     const cached = readCache();
     if (cached) {
-      if (cacheAge() > 10 * 60 * 1000) refresh().catch(() => {});
+      if (cacheAge() > 6 * 60 * 60 * 1000) refresh().catch(() => {});
       return cached;
     }
   }
@@ -79,6 +79,14 @@ async function getManifest(force = false) {
     const cached = readCache();
     if (cached) return cached;
     throw error;
+  }
+}
+
+async function warmManifest() {
+  try {
+    await getManifest();
+  } catch {
+    /* нет сети — вкладка покажет ошибку при открытии */
   }
 }
 
@@ -570,6 +578,7 @@ function isDirSize(dir) {
 
 module.exports = {
   getManifest,
+  warmManifest,
   getVersionJson,
   resolveVersion,
   installVersion,

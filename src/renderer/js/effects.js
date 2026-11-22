@@ -173,7 +173,7 @@
   window.accentRgba = accentRgba;
 
   function applyTheme(name) {
-    document.documentElement.dataset.theme = name === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = name === 'light' || name === 'neon' ? name : 'dark';
   }
 
   window.Effects = {

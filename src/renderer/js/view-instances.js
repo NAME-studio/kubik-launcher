@@ -18,16 +18,11 @@ window.Views.instances = (() => {
   }
 
   async function createDialog(prefill = {}) {
-    const manifest = await loadManifest().catch((error) => {
-      UI.toast(error.message, 'error');
-      return null;
-    });
-    if (!manifest) return;
-
-    const versions = manifest.versions;
+    const cached = App.state.manifest || null;
+    let versions = cached && Array.isArray(cached.versions) ? cached.versions : [];
     const data = {
       name: prefill.name || '',
-      mcVersion: prefill.mcVersion || manifest.latest.release,
+      mcVersion: prefill.mcVersion || (cached && cached.latest ? cached.latest.release : ''),
       loader: prefill.loader || 'vanilla',
       loaderVersion: '',
       loaderVersions: [],
@@ -50,6 +45,8 @@ window.Views.instances = (() => {
     const selected = UI.el('div', { class: 'row', style: { gap: '8px' } });
     const searchInput = UI.el('input', { class: 'input', placeholder: 'Поиск версии, например 1.20' });
     const list = UI.el('div', { class: 'version-picker' });
+    const typeRow = UI.el('div', { class: 'tabs version-types' });
+    const typeState = { release: true, snapshot: false, old_beta: false, old_alpha: false };
     const loaderRow = UI.el('div', { class: 'chips' });
     const loaderSelect = UI.el('select', { class: 'select' });
     const loaderWrap = UI.el('div', { class: 'field hidden' }, UI.el('label', {}, 'Версия загрузчика'), loaderSelect);
@@ -63,11 +60,14 @@ window.Views.instances = (() => {
       step: '512',
       value: String(data.memory),
     });
-    memSlider.style.setProperty('--fill', '35%');
+    memSlider.style.setProperty(
+      '--ratio',
+      `${(Number(memSlider.value) - 1024) / (Number(memSlider.max) - 1024)}`,
+    );
     memSlider.addEventListener('input', () => {
       data.memory = Number(memSlider.value);
       memValue.textContent = `${data.memory} МБ`;
-      memSlider.style.setProperty('--fill', `${((data.memory - 1024) / (Number(memSlider.max) - 1024)) * 100}%`);
+      memSlider.style.setProperty('--ratio', `${((data.memory - 1024) / (Number(memSlider.max) - 1024))}`);
     });
 
     const installSwitch = UI.el('div', { class: 'switch on' });
@@ -83,9 +83,30 @@ window.Views.instances = (() => {
 
     let shownVersions = 120;
 
+    function renderTypeChips() {
+      UI.clear(typeRow);
+      for (const [id, label] of [['release', 'Релизы'], ['snapshot', 'Снапшоты'], ['old_beta', 'Беты'], ['old_alpha', 'Альфы']]) {
+        const chip = UI.el('button', {
+          class: `tab${typeState[id] ? ' active' : ''}`,
+          type: 'button',
+          title: typeState[id] ? 'Скрыть' : 'Показать',
+          onclick: () => {
+            typeState[id] = !typeState[id];
+            if (!Object.values(typeState).some(Boolean)) typeState[id] = true;
+            renderTypeChips();
+            renderVersions();
+          },
+        }, label);
+        typeRow.append(chip);
+      }
+    }
+
     function renderVersions() {
       const query = searchInput.value.trim().toLowerCase();
-      const filtered = versions.filter((v) => !query || v.id.toLowerCase().includes(query) || v.type.includes(query));
+      const filtered = versions.filter((v) => {
+        if (!typeState[v.type]) return false;
+        return !query || v.id.toLowerCase().includes(query) || v.type.includes(query);
+      });
       const visible = filtered.slice(0, shownVersions);
       UI.clear(list);
       for (const version of visible) {
@@ -106,20 +127,15 @@ window.Views.instances = (() => {
         list.append(row);
       }
       if (filtered.length > shownVersions) {
-        list.append(
-          UI.el(
-            'button',
-            {
-              class: 'btn sm',
-              style: { margin: '10px auto 2px', display: 'block' },
-              onclick: () => {
-                shownVersions += 120;
-                renderVersions();
-              },
-            },
-            `Показать ещё (${filtered.length - shownVersions})`,
-          ),
-        );
+        const sentinel = UI.el('div', { class: 'load-more', text: `Подгружаю… ${filtered.length - shownVersions}` });
+        list.append(sentinel);
+        const watcher = new IntersectionObserver((entries) => {
+          if (!entries.some((entry) => entry.isIntersecting)) return;
+          watcher.disconnect();
+          shownVersions += 120;
+          renderVersions();
+        }, { root: list.closest('.scroll, .page') || null, rootMargin: '200px' });
+        watcher.observe(sentinel);
       }
       if (!filtered.length) list.append(UI.el('div', { class: 'vp-row muted', text: 'Ничего не найдено' }));
     }
@@ -202,7 +218,7 @@ window.Views.instances = (() => {
 
     body.append(
       UI.el('div', { class: 'field' }, UI.el('label', {}, 'Название сборки'), nameInput),
-      UI.el('div', { class: 'field' }, UI.el('label', {}, 'Версия Minecraft'), selected, searchInput, list),
+      UI.el('div', { class: 'field' }, UI.el('label', {}, 'Версия Minecraft'), selected, searchInput, typeRow, list),
       UI.el('div', { class: 'field' }, UI.el('label', {}, 'Загрузчик модов'), loaderRow, loaderWrap),
       UI.el('div', { class: 'field' }, UI.el('label', {}, 'Обложка'), coverRow),
       UI.el(
@@ -219,10 +235,30 @@ window.Views.instances = (() => {
       ),
     );
 
+    renderTypeChips();
     renderVersions();
     renderSelected();
     renderLoaders();
     renderCovers();
+
+    if (!versions.length) {
+      UI.clear(list);
+      list.append(UI.el('div', { class: 'vp-row muted', text: 'Загружаю список версий…' }));
+      loadManifest()
+        .then((manifest) => {
+          versions = manifest.versions || [];
+          if (!data.mcVersion) {
+            data.mcVersion = manifest.latest.release;
+            renderSelected();
+            loadLoaderVersions();
+          }
+          renderVersions();
+        })
+        .catch((error) => {
+          UI.clear(list);
+          list.append(UI.el('div', { class: 'vp-row muted', text: `Не удалось загрузить версии: ${error.message}` }));
+        });
+    }
     searchInput.addEventListener(
       'input',
       UI.debounce(() => {
@@ -323,25 +359,25 @@ window.Views.instances = (() => {
       const value = badge(`${slider.value}${suffix || ''}`);
       slider.addEventListener('input', () => {
         value.textContent = `${slider.value}${suffix || ''}`;
-        slider.style.setProperty('--fill', `${((Number(slider.value) - Number(slider.min)) / (Number(slider.max) - Number(slider.min))) * 100}%`);
+        slider.style.setProperty('--ratio', `${((Number(slider.value) - Number(slider.min)) / (Number(slider.max) - Number(slider.min)))}`);
       });
       return UI.el('div', { class: 'field' }, UI.el('div', { class: 'row between' }, UI.el('label', {}, label), value), slider);
     }
 
     const renderDist = UI.el('input', { class: 'slider', type: 'range', min: '2', max: '32', step: '1', value: '8' });
-    renderDist.style.setProperty('--fill', '20%');
+    renderDist.style.setProperty('--ratio', '0.2');
     renderDist.addEventListener('change', () => save({ renderDistance: renderDist.value }));
 
     const simDist = UI.el('input', { class: 'slider', type: 'range', min: '5', max: '32', step: '1', value: '8' });
-    simDist.style.setProperty('--fill', '11%');
+    simDist.style.setProperty('--ratio', '0.11');
     simDist.addEventListener('change', () => save({ simulationDistance: simDist.value }));
 
     const fov = UI.el('input', { class: 'slider', type: 'range', min: '30', max: '110', step: '1', value: '70' });
-    fov.style.setProperty('--fill', '50%');
+    fov.style.setProperty('--ratio', '0.5');
     fov.addEventListener('change', () => save({ fov: fov.value }));
 
     const volume = UI.el('input', { class: 'slider', type: 'range', min: '0', max: '100', step: '5', value: '80' });
-    volume.style.setProperty('--fill', '80%');
+    volume.style.setProperty('--ratio', '0.8');
     volume.addEventListener('change', () => save({ soundCategory_master: (Number(volume.value) / 100).toFixed(1) }));
 
     const maxFps = UI.el('input', { class: 'input', type: 'number', min: '30', max: '260', step: '10', value: '120' });
@@ -431,9 +467,9 @@ window.Views.instances = (() => {
     memSlider.addEventListener('input', () => {
       data.memoryMB = Number(memSlider.value);
       memValue.textContent = `${data.memoryMB} МБ`;
-      memSlider.style.setProperty('--fill', `${((data.memoryMB - 1024) / (Number(memSlider.max) - 1024)) * 100}%`);
+      memSlider.style.setProperty('--ratio', `${((data.memoryMB - 1024) / (Number(memSlider.max) - 1024))}`);
     });
-    memSlider.style.setProperty('--fill', `${((data.memoryMB - 1024) / (Number(memSlider.max) - 1024)) * 100}%`);
+    memSlider.style.setProperty('--ratio', `${((data.memoryMB - 1024) / (Number(memSlider.max) - 1024))}`);
 
     const widthInput = UI.el('input', { class: 'input', type: 'number', value: String(data.resolution.width), min: '640', oninput: (e) => (data.resolution.width = Number(e.target.value)) });
     const heightInput = UI.el('input', { class: 'input', type: 'number', value: String(data.resolution.height), min: '480', oninput: (e) => (data.resolution.height = Number(e.target.value)) });
@@ -743,7 +779,12 @@ window.Views.instances = (() => {
         onclick: () => (selecting ? togglePick(instance.id) : settingsDialog(instance)),
       },
       selecting ? check : null,
-      UI.el('div', { class: 'inst-cover', style: { backgroundImage: `url("${cover}")` } }, badges),
+      UI.el('div', { class: 'inst-cover', style: { backgroundImage: `url("${cover}")` } },
+        badges,
+        instance.icon
+          ? UI.el('img', { class: 'cover-icon', src: instance.icon, alt: '', loading: 'lazy' })
+          : null,
+      ),
       UI.el(
         'div',
         { class: 'inst-body' },

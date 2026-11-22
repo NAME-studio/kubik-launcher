@@ -155,10 +155,13 @@
     if (gallery) {
       cover.style.backgroundImage = `url("${gallery}")`;
     } else {
-      cover.classList.add('no-art');
+      cover.style.backgroundImage = `url("${UI.coverBySeed(item.id || item.slug || item.title)}")`;
     }
     if (item.icon) {
       cover.append(UI.el('img', { class: 'cover-icon', src: item.icon, alt: '', loading: 'lazy' }));
+    } else {
+      const words = String(item.title || '?').trim().split(/\s+/).slice(0, 2);
+      cover.append(UI.el('div', { class: 'cover-initials', text: words.map((w) => w[0]).join('').toUpperCase() }));
     }
     cover.append(
       UI.el('div', { class: 'badges' }, UI.el('span', { class: 'badge accent', text: 'модпак' })),
@@ -778,7 +781,6 @@
       const label = item.querySelector('span');
       if (label && label.textContent.trim()) {
         item.dataset.label = label.textContent.trim();
-        item.title = label.textContent.trim();
       }
       item.addEventListener('click', () => App.go(item.dataset.route));
     });
@@ -1059,6 +1061,15 @@
             App.state.javaList = App.state.javaList || [];
           });
       }, 400);
+      setTimeout(() => {
+        UI.req(window.api.versions.manifest())
+          .then((manifest) => {
+            App.state.manifest = manifest;
+          })
+          .catch(() => {
+            /* список версий загрузится при открытии диалога */
+          });
+      }, 900);
       document.getElementById('tb-version').textContent = `v${App.state.info.versionLabel || App.state.info.version}`;
       updateStatus();
       document.title = 'Kubik Launcher';

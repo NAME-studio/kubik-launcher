@@ -285,6 +285,8 @@ async function launch(instance, account, handlers = {}) {
     writeLog(text, stream);
   };
 
+  const startedAt = Date.now();
+
   for (let attempt = 1; attempt <= 6; attempt += 1) {
     try {
       child = spawn(command.javaPath, args, {
@@ -368,7 +370,9 @@ async function launch(instance, account, handlers = {}) {
     writeLog(`Игра завершилась. Код: ${code}${signal ? `, сигнал: ${signal}` : ''}\n`);
     const instanceData = instances.readInstance(instance.id);
     if (instanceData) {
+      const playedSeconds = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
       instanceData.lastPlayed = Date.now();
+      instanceData.playSeconds = Math.round((instanceData.playSeconds || 0) + playedSeconds);
       instances.writeInstance(instanceData);
     }
     onExit({ code, signal, logFile });

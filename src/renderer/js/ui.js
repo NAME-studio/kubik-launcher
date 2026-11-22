@@ -112,6 +112,14 @@
 
   UI.coverFor = (cover) => `assets/cover-${UI.coverKey(cover)}.jpg`;
 
+  // Одна из шести обложек по хешу — стабильно для одной и той же карточки
+  UI.coverBySeed = (seed) => {
+    const text = String(seed || 'kubik');
+    let hash = 0;
+    for (let i = 0; i < text.length; i += 1) hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+    return UI.coverFor(UI.COVERS[hash % UI.COVERS.length]);
+  };
+
   UI.debounce = (fn, delay = 350) => {
     let timer = null;
     return (...args) => {

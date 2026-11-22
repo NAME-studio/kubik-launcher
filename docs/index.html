@@ -810,7 +810,7 @@
         </defs>
       </svg>
       Kubik Launcher
-      <small data-version>1.2.8</small>
+      <small data-version>1.2.9</small>
     </a>
     <button class="menu-btn" type="button" aria-expanded="false" aria-controls="nav">Меню</button>
     <nav class="nav" id="nav" aria-label="Основная навигация">
@@ -831,7 +831,7 @@
   <section class="hero">
     <div class="wrap">
       <div class="hero-copy">
-        <p class="eyebrow"><b data-version>1.2.8</b> Windows 10/11 · бесплатно · MIT</p>
+        <p class="eyebrow"><b data-version>1.2.9</b> Windows 10/11 · бесплатно · MIT</p>
         <h1>Майнкрафт запускается <em>за пару секунд</em></h1>
         <p class="lead">
           Kubik Launcher проверяет файлы игры один раз, кэширует Java и больше не пересчитывает хеши
@@ -842,8 +842,8 @@
           <a class="btn primary" data-download="setup" href="https://github.com/NAME-studio/kubik-launcher/releases/latest">
             Скачать установщик
           </a>
-          <a class="btn" data-download="portable" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.8/KubikLauncher-1.2.8-portable.zip">
-            Портативная версия
+          <a class="btn" data-download="portable" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.9/KubikLauncher.exe">
+            Портативная версия (один exe)
           </a>
           <a class="btn" href="https://discord.gg/VCemrH6M44" rel="noopener">Discord</a>
         </div>
@@ -1076,8 +1076,8 @@
           <strong>Windows показывает предупреждение?</strong> Установщик пока не подписан сертификатом, поэтому SmartScreen
           может написать «Windows защитила ваш компьютер». Нажмите «Подробнее» → «Выполнить в любом случае»
           или сверьте контрольную сумму с
-          <a data-download="sums" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.8/SHA256SUMS.txt">SHA256SUMS.txt</a>.
-          Проверить файл можно командой <code>certutil -hashfile KubikLauncher-Setup-<span data-version>1.2.8</span>.exe SHA256</code>.
+          <a data-download="sums" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.9/SHA256SUMS.txt">SHA256SUMS.txt</a>.
+          Проверить файл можно командой <code>certutil -hashfile KubikLauncher-Setup-<span data-version>1.2.9</span>.exe SHA256</code>.
           Установщик проверен в
           <a href="https://www.virustotal.com/gui/file/6c558ae8cf7a91a3c87ed9be9a5b291d316632918f46e3c5e6e52319afec948f">VirusTotal</a>
           (версия 1.1.9).
@@ -1096,6 +1096,20 @@
       </div>
 
       <div class="timeline">
+                        <article class="release">
+          <div>
+            <div class="ver">1.2.9</div>
+            <span class="date">ноябрь 2026</span>
+          </div>
+          <ul>
+            <li>Каталог модов, модпаков, ресурспаков и шейдеров кэшируется на диск и прогревается при старте — вкладка «Моды» открывается за 247 мс вместо 904.</li>
+            <li>Список версий Minecraft грузится в фоне и идёт от новых к старым — раньше сверху оказывались версии 2017 года.</li>
+            <li>Бесконечная прокрутка: кнопки «Показать ещё» в «Версиях» и в диалоге новой сборки больше нет.</li>
+            <li>Кнопка Discord Rich Presence «Скачать» открывает страницу релизов, а не лендинг.</li>
+            <li>«Сообщить о баге» подставляет версию и платформу в обращение.</li>
+          </ul>
+        </article>
+
                         <article class="release">
           <div>
             <div class="ver">1.2.8</div>
@@ -1369,7 +1383,7 @@
       <h4>Ссылки</h4>
       <a href="https://github.com/NAME-studio/kubik-launcher">Исходники</a>
       <a href="https://github.com/NAME-studio/kubik-launcher/releases">Релизы</a>
-      <a data-download="sums" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.8/SHA256SUMS.txt">Контрольные суммы</a>
+      <a data-download="sums" href="https://github.com/NAME-studio/kubik-launcher/releases/download/v1.2.9/SHA256SUMS.txt">Контрольные суммы</a>
       <a href="https://github.com/NAME-studio/kubik-launcher/issues/new?template=bug_report.yml">Сообщить о баге</a>
       <a href="https://discord.gg/VCemrH6M44" rel="noopener">Discord</a>
       <a href="privacy.html">Конфиденциальность</a>
@@ -1408,7 +1422,7 @@
 
   (function () {
     var REPO = 'NAME-studio/kubik-launcher';
-    var FALLBACK_VERSION = '1.2.8';
+    var FALLBACK_VERSION = '1.2.9';
 
     var setVersion = function (version) {
       if (!version) return;

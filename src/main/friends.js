@@ -166,6 +166,50 @@ async function ensureIdentity() {
   return uid;
 }
 
+function describeCloudError(error) {
+  const status = error && error.status;
+  if (status === 403) return 'правила Firestore не пускают — нужно опубликовать firebase/firestore.rules';
+  if (status === 429) return 'исчерпана квота бесплатного тарифа — подождите до обнуления';
+  if (status === 404) return 'документ не найден в облаке';
+  if (status === 0 || /timeout|ECONN|ENOTFOUND/i.test(String(error && error.message))) return 'нет связи с облаком — проверьте интернет';
+  return String((error && error.message) || 'неизвестная ошибка');
+}
+
+async function diagnose() {
+  const steps = [];
+  if (!configured()) {
+    steps.push({ name: 'Облако', ok: false, text: 'облако не настроено в этой сборке' });
+    return { ok: false, code: myCode(), steps };
+  }
+
+  let uid = '';
+  try {
+    const session = await auth.ensureSession();
+    uid = session.uid || '';
+    steps.push({ name: 'Вход в облако', ok: Boolean(uid), text: uid ? 'вход выполнен' : 'облако не выдало идентификатор' });
+  } catch (error) {
+    steps.push({ name: 'Вход в облако', ok: false, text: describeCloudError(error) });
+    return { ok: false, code: myCode(), steps };
+  }
+  if (!uid) return { ok: false, code: myCode(), steps };
+
+  try {
+    await cloud.patchDoc('users', uid, { uid, code: myCode(), name: myName() || myCode(), updated: Date.now() });
+    steps.push({ name: 'Профиль', ok: true, text: 'сохранён' });
+  } catch (error) {
+    steps.push({ name: 'Профиль', ok: false, text: describeCloudError(error) });
+  }
+
+  try {
+    await cloud.setDoc('codes', myCode(), { uid, friendId: uid, at: Date.now() });
+    steps.push({ name: 'Код друга', ok: true, text: `${myCode()} зарегистрирован` });
+  } catch (error) {
+    steps.push({ name: 'Код друга', ok: false, text: describeCloudError(error) });
+  }
+
+  return { ok: steps.every((step) => step.ok), code: myCode(), uid, steps };
+}
+
 async function publish(doc = {}) {  if (!configured()) return null;
   const patch = {
     name: myName() || myCode(),
@@ -865,4 +909,5 @@ module.exports = {
   syncLinkedPacks,
   ensureSharedInstances,
   configured,
+  diagnose,
 };

@@ -18,8 +18,8 @@
   --accent2-rgb: 63, 208, 168;
   --accent-2: #3fd0a8;
   --accent-soft: rgba(var(--accent-rgb), 0.14);
-  --accent-text: var(--accent);
-  --accent-2-text: var(--accent-2);
+  --accent-text: color-mix(in srgb, rgb(var(--accent-rgb)) 82%, #ffffff);
+  --accent-2-text: color-mix(in srgb, rgb(var(--accent2-rgb)) 82%, #ffffff);
   --cyan: #5cc8ff;
   --violet: #a78bfa;
   --orange: #f8a94c;
@@ -677,7 +677,7 @@ body::before {
 
 .switch.on::after {
   transform: translateX(18px);
-  background: #08130b;
+  background: var(--on-accent, #ffffff);
 }
 
 .switch-row {
@@ -685,7 +685,7 @@ body::before {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 13px 0;
+  padding: 9px 0;
   border-bottom: 1px solid var(--border-soft);
 }
 
@@ -717,7 +717,7 @@ body::before {
   border-radius: 999px;
   background: linear-gradient(90deg, var(--accent), var(--accent-2)) no-repeat,
     var(--surface-bar);
-  background-size: var(--fill, 50%) 100%, 100% 100%;
+  background-size: calc(18px + (100% - 18px) * var(--ratio, 0.5)) 100%, 100% 100%;
 }
 
 .slider::-webkit-slider-thumb {
@@ -761,7 +761,7 @@ body::before {
 .chip.active {
   background: var(--accent-soft);
   border-color: rgba(var(--accent-rgb), 0.45);
-  color: #c8f7b6;
+  color: var(--accent-text);
 }
 
 .badge {
@@ -1732,7 +1732,7 @@ input[type="color"] {
 .setting-block {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .java-option {
@@ -2039,7 +2039,7 @@ input[type="color"] {
 
 .version-picker .vp-row.active {
   background: rgba(var(--accent-rgb), 0.09);
-  color: #c8f7b6;
+  color: var(--accent-text);
 }
 
 .progress-line {
@@ -2158,16 +2158,22 @@ input[type="color"] {
   z-index: 3;
 }
 
-/* Настройки: плотная двухколоночная раскладка без провалов */
+/* Настройки: сетка без пустых колонок */
 .settings-cols {
-  columns: 2;
-  column-gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+  align-content: start;
 }
 
 .settings-cols > .card {
-  break-inside: avoid;
-  margin: 0 0 16px;
+  margin: 0;
   width: 100%;
+}
+
+.settings-cols > .card.full {
+  grid-column: 1 / -1;
 }
 
 .settings-about {
@@ -2181,9 +2187,9 @@ input[type="color"] {
   min-width: 0;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 940px) {
   .settings-cols {
-    columns: 1;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2639,3 +2645,363 @@ a:hover { color: var(--accent-2-text); }
 .profile-banner-hint { font-size: 12px; color: var(--muted-2); }
 .profile-avatar-preview { width: 84px; height: 84px; border-radius: 18px; overflow: hidden; flex: none; border: 1px solid var(--border); background: var(--panel-3); display: grid; place-items: center; font-size: 20px; font-weight: 700; color: var(--muted); }
 .profile-avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ---------- Друзья: редизайн ---------- */
+.friends-layout {
+  grid-template-columns: 268px minmax(0, 1fr) 292px;
+  gap: 10px;
+  height: calc(100vh - 168px);
+}
+.friends-side, .friends-chat, .friends-packs-card { padding: 10px 12px 12px; }
+.friends-counters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 2px 0 8px; }
+.friends-count {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--border-soft); background: var(--panel-2); color: var(--muted);
+  white-space: nowrap;
+}
+.friends-count.live { color: var(--accent-text); border-color: rgba(var(--accent-rgb), .38); background: rgba(var(--accent-rgb), .1); }
+.friends-count.live::before {
+  content: ""; width: 6px; height: 6px; border-radius: 999px; background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .18);
+}
+.friends-tabs {
+  display: flex; gap: 4px; padding: 3px; margin-bottom: 8px;
+  border: 1px solid var(--border-soft); border-radius: 10px; background: var(--panel-2);
+}
+.friends-tab {
+  flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 5px 6px; border: none; border-radius: 8px; background: transparent;
+  color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.friends-tab:hover { color: var(--text); background: var(--hover); }
+.friends-tab.on { background: var(--panel); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+.friends-tab-badge {
+  min-width: 16px; padding: 0 4px; border-radius: 999px; font-size: 10px; line-height: 16px;
+  text-align: center; background: var(--panel-3); color: var(--muted);
+}
+.friends-tab.on .friends-tab-badge { background: rgba(var(--accent-rgb), .18); color: var(--accent-text); }
+.friends-tab-badge.hidden { display: none; }
+.friends-list { gap: 3px; }
+.friend-row { padding: 7px 8px; border-radius: 10px; gap: 9px; }
+.friend-avatar { width: 38px; height: 38px; border-radius: 11px; font-size: 13px; }
+.friend-name { font-size: 13px; }
+.friend-status-line { font-size: 11px; }
+.friends-empty { align-items: flex-start; padding: 18px 6px; gap: 8px; }
+.friends-empty.soft { align-items: center; text-align: center; padding: 26px 8px; }
+.friends-empty-icon {
+  width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--panel-2); border: 1px solid var(--border-soft); color: var(--muted);
+}
+.friends-empty-icon .icon { width: 18px; height: 18px; }
+.friends-empty-title { font-weight: 650; font-size: 13px; }
+.friends-empty p { margin: 0; line-height: 1.45; }
+.friends-empty .btn { margin-top: 2px; }
+
+/* ---------- Скины: редактор без пустот ---------- */
+.editor-card { display: flex; flex-direction: column; min-height: 0; }
+.editor-card .editor-body {
+  grid-template-columns: minmax(0, 1fr) 248px;
+  gap: 12px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.editor-card .canvas-wrap { min-height: 420px; }
+.editor-side { gap: 10px; }
+.palette { grid-template-columns: repeat(8, 1fr); gap: 5px; }
+.palette .swatch { border-radius: 6px; }
+.editor-side .divider { margin: 2px 0; }
+.canvas-column { gap: 8px; }
+.skins-main .skin-tabs { margin-top: 10px; }
+
+/* Главная: друзья в сети и наигранное время */
+.hero-meta .live { color: var(--accent-text); }
+.hero-meta .live .icon { color: var(--accent-text); }
+.hero-actions .btn.lg { white-space: nowrap; }
+
+/* ---------- Настройки: подвкладки ---------- */
+.settings-tabs {
+  display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px;
+  padding: 4px; border: 1px solid var(--border-soft); border-radius: 12px; background: var(--panel-2);
+}
+.settings-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border: none; border-radius: 9px; background: transparent;
+  color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.settings-tab:hover { color: var(--text); background: var(--hover); }
+.settings-tab.on { background: var(--panel); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+.settings-tab .icon { width: 15px; height: 15px; }
+.settings-tab.on .icon { color: var(--accent-text); }
+
+/* Вкладки друзей: подпись не обрезается в узкой колонке */
+.friends-tab { padding: 5px 4px; font-size: 11px; gap: 4px; }
+.friends-tab > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friends-tab-badge { flex: none; }
+
+
+/* Настройки: одна карточка на всю ширину */
+.settings-cols.single { grid-template-columns: minmax(0, 1fr); }
+
+/* Обложки: размытый арт и инициалы вместо пустоты */
+.inst-cover .cover-blur {
+  position: absolute;
+  inset: -12%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(22px) saturate(1.2);
+  opacity: 0.5;
+  transform: scale(1.08);
+  z-index: 0;
+}
+.inst-cover .cover-initials {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.85);
+  z-index: 1;
+}
+
+/* Обложки в стиле Modrinth/CurseForge: широкий арт + круглая иконка в левом нижнем углу */
+.inst-cover { height: 152px; }
+.inst-cover .cover-icon {
+  position: absolute;
+  inset: auto auto 12px 12px;
+  margin: 0;
+  width: 46px;
+  height: 46px;
+  padding: 3px;
+  border-radius: 50%;
+  background: rgba(9, 13, 20, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  object-fit: contain;
+  filter: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+  z-index: 3;
+}
+.inst-cover .cover-initials {
+  position: absolute;
+  inset: auto auto 12px 12px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: #eef4ff;
+  background: rgba(9, 13, 20, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  z-index: 3;
+}
+
+/* Обложки в списках модов, ресурспаков и шейдеров */
+.mod-cover {
+  position: relative;
+  width: 124px;
+  height: 68px;
+  flex: none;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--panel-3);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.mod-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8, 10, 15, 0) 35%, rgba(8, 10, 15, 0.55));
+}
+.mod-cover .mod-cover-icon {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  width: 30px;
+  height: 30px;
+  padding: 2px;
+  border-radius: 50%;
+  background: rgba(9, 13, 20, 0.82);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  object-fit: contain;
+  z-index: 2;
+}
+.mod-cover .mod-icon.placeholder {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  z-index: 2;
+}
+
+/* Карточки модов: обложка сверху, текст снизу */
+.mod-grid { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.mod-card {
+  flex-direction: column;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+.mod-card .mod-cover {
+  width: 100%;
+  height: 132px;
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: 1px solid var(--border-soft);
+}
+.mod-card .mod-main {
+  padding: 10px 12px 12px;
+  gap: 4px;
+  flex: 1 1 auto;
+}
+.mod-card .mod-title {
+  white-space: normal;
+  line-height: 1.3;
+}
+.mod-card .mod-foot { margin-top: 8px; }
+.mod-card .mod-cover-icon {
+  width: 34px;
+  height: 34px;
+  left: 8px;
+  bottom: 8px;
+}
+
+/* Обложка-заглушка: размытая иконка мода, когда скриншота нет */
+.mod-cover .cover-blur {
+  position: absolute;
+  inset: -10%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(18px) saturate(1.5);
+  opacity: 0.78;
+  transform: scale(1.1);
+  z-index: 0;
+}
+
+/* Заглушка без скриншота: крупный логотип на аккуратном градиенте */
+.cover-solo,
+.mod-cover.cover-solo {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 28% 18%, rgba(var(--accent-rgb), 0.16), transparent 62%),
+    linear-gradient(140deg, var(--surface-tile), var(--surface-tile-2));
+  background-size: cover;
+}
+.cover-solo .cover-solo-icon,
+.mod-cover .cover-solo-icon {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55));
+  z-index: 2;
+}
+.mod-cover.cover-solo::after { display: none; }
+
+/* ============================================================
+   Пакет анимаций
+   ============================================================ */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.94); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(var(--accent-rgb), 0); }
+}
+
+/* страницы и секции при смене раздела */
+.page > * { animation: fade-up 0.28s ease both; }
+.page > *:nth-child(2) { animation-delay: 0.04s; }
+.page > *:nth-child(3) { animation-delay: 0.08s; }
+.page > *:nth-child(4) { animation-delay: 0.12s; }
+
+/* карточки: плавный подъём и подсветка */
+.inst-card,
+.mod-card,
+.highlight,
+.mpack-card { transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; }
+.inst-card:hover,
+.mod-card:hover { transform: translateY(-3px); }
+
+/* списки друзей и модов появляются каскадом */
+.friend-row { animation: slide-in-left 0.22s ease both; }
+.friend-row:nth-child(2) { animation-delay: 0.03s; }
+.friend-row:nth-child(3) { animation-delay: 0.06s; }
+.friend-row:nth-child(4) { animation-delay: 0.09s; }
+.friend-row:nth-child(5) { animation-delay: 0.12s; }
+
+/* сообщения в чате */
+.chat-bubble,
+.chat-messages > * { animation: fade-up 0.2s ease both; }
+
+/* модалки и тосты */
+.modal { animation: pop-in 0.18s ease both; }
+.toast { animation: fade-up 0.2s ease both; }
+
+/* вкладки и сегменты */
+.tab,
+.settings-tab,
+.friends-seg-btn,
+.friends-filter { transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease; }
+
+/* индикатор «в сети» пульсирует */
+.friend-avatar.online::after,
+.friends-count.live::before { animation: glow-pulse 2.4s ease-in-out infinite; }
+
+/* кнопки: лёгкое нажатие */
+.btn { transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease, border-color 0.15s ease; }
+.btn:active { transform: translateY(1px) scale(0.995); }
+
+/* уважение к настройке «меньше движения» */
+@media (prefers-reduced-motion: reduce) {
+  .page > *,
+  .friend-row,
+  .chat-bubble,
+  .chat-messages > *,
+  .modal,
+  .toast,
+  .inst-card,
+  .mod-card,
+  .friend-avatar.online::after,
+  .friends-count.live::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Плитки типов версий */
+.version-mark {
+  width: 34px; height: 34px; flex: none;
+  border-radius: 10px; display: grid; place-items: center;
+  background: var(--surface-tile); color: var(--muted);
+  border: 1px solid var(--border-soft);
+}
+.version-mark.release { background: rgba(var(--accent-rgb), 0.12); color: var(--accent-text); border-color: rgba(var(--accent-rgb), 0.22); }
+.version-mark.snapshot { background: rgba(90, 150, 255, 0.14); color: #7fb0ff; border-color: rgba(90, 150, 255, 0.24); }
+.version-mark.old_beta { background: rgba(255, 172, 64, 0.16); color: #d99a3a; border-color: rgba(255, 172, 64, 0.26); }
+.version-mark.old_alpha { background: rgba(160, 120, 255, 0.16); color: #9b83f0; border-color: rgba(160, 120, 255, 0.26); }
+html[data-theme="light"] .version-mark { background: #f2f5fb; color: #6b7686; }
+html[data-theme="light"] .version-mark.release { background: color-mix(in srgb, rgb(var(--accent-rgb)) 10%, #ffffff); color: color-mix(in srgb, rgb(var(--accent-rgb)) 55%, #4a5563); }

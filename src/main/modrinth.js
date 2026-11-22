@@ -35,6 +35,13 @@ function buildFacets({ projectType, gameVersion, loader, categories }) {
   return JSON.stringify(facets);
 }
 
+function normalizeGallery(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((shot) => (typeof shot === 'string' ? { url: shot } : { url: shot && shot.url }))
+    .filter((shot) => shot && shot.url);
+}
+
 function normalizeHit(hit) {
   return {
     id: hit.project_id,
@@ -47,18 +54,51 @@ function normalizeHit(hit) {
     categories: hit.categories || [],
     versions: hit.versions || [],
     author: hit.author,
-    gallery: hit.gallery || [],
+    gallery: normalizeGallery(hit.gallery),
     type: hit.project_type,
     dateModified: hit.date_modified,
   };
 }
 
 const searchCache = new Map();
+const DISK_CACHE_TTL = 6 * 60 * 60 * 1000;
+
+function diskCacheFile(key) {
+  const hash = require('crypto').createHash('sha1').update(key).digest('hex').slice(0, 20);
+  return path.join(paths.cache(), 'catalog', `${hash}.json`);
+}
+
+function readDiskCache(key) {
+  try {
+    const file = diskCacheFile(key);
+    if (!exists(file)) return null;
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!raw || !raw.data || Date.now() - Number(raw.time || 0) > DISK_CACHE_TTL) return null;
+    return raw.data;
+  } catch {
+    return null;
+  }
+}
+
+function writeDiskCache(key, data) {
+  try {
+    const file = diskCacheFile(key);
+    ensureDir(path.dirname(file));
+    fs.writeFileSync(file, JSON.stringify({ time: Date.now(), data }), 'utf8');
+  } catch {
+    /* кэш на диске — необязательный ускоритель */
+  }
+}
 
 async function search(options = {}) {
   const cacheKey = JSON.stringify(options);
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.time < 120000) return cached.data;
+  const fromDisk = readDiskCache(cacheKey);
+  if (fromDisk) {
+    searchCache.set(cacheKey, { time: Date.now(), data: fromDisk });
+    return fromDisk;
+  }
   const params = new URLSearchParams();
   params.set('query', options.query || '');
   params.set('limit', String(Math.min(40, options.limit || 20)));
@@ -67,20 +107,38 @@ async function search(options = {}) {
   const facets = buildFacets(options);
   if (facets !== '[]') params.set('facets', facets);
   const data = await net.fetchJson(`${API}/search?${params.toString()}`, { headers: headers(), timeout: 25000 });
+  const hits = (data.hits || []).map(normalizeHit);
+  const withoutArt = hits.filter((hit) => !(hit.gallery && hit.gallery.length)).map((hit) => hit.id);
+  if (withoutArt.length) {
+    try {
+      const projects = await getProjects(withoutArt.slice(0, 40));
+      const byId = new Map(projects.map((project) => [project.id, project]));
+      for (const hit of hits) {
+        if (hit.gallery && hit.gallery.length) continue;
+        const project = byId.get(hit.id);
+        if (!project || !Array.isArray(project.gallery) || !project.gallery.length) continue;
+        hit.gallery = project.gallery
+          .map((shot) => ({ url: shot.url, featured: Boolean(shot.featured) }))
+          .filter((shot) => shot.url);
+      }
+    } catch {
+      /* галереи не критичны — карточка отрисуется с иконкой */
+    }
+  }
   const result = {
-    hits: (data.hits || []).map(normalizeHit),
+    hits,
     total: data.total_hits || 0,
     offset: data.offset || 0,
     limit: data.limit || 20,
   };
   if (searchCache.size > 120) searchCache.clear();
   searchCache.set(cacheKey, { time: Date.now(), data: result });
+  writeDiskCache(cacheKey, result);
   return result;
 }
 
 async function getProjects(ids) {
-  if (!ids.length) return [];
-  const data = await net.fetchJson(`${API}/projects?ids=${encodeURIComponent(JSON.stringify(ids))}`, {
+  if (!ids.length) return [];  const data = await net.fetchJson(`${API}/projects?ids=${encodeURIComponent(JSON.stringify(ids))}`, {
     headers: headers(),
     timeout: 25000,
   });
@@ -629,6 +687,17 @@ async function updateAll(instanceId, onProgress) {
   return results;
 }
 
+async function warmCatalog() {
+  const types = ["mod", "modpack", "resourcepack", "shader", "datapack"];
+  for (const projectType of types) {
+    try {
+      await search({ projectType, gameVersion: null, loader: null, query: "", index: "relevance", limit: 12, offset: 0, categories: null });
+    } catch {
+      /* прогрев каталога не должен мешать работе лаунчера */
+    }
+  }
+}
+
 module.exports = {
   API,
   FOLDERS,
@@ -645,6 +714,5 @@ module.exports = {
   featuredModpacks,
   updateProjectCheck,
   updateAll,
-  pickVersion,
-};
+  pickVersion,  warmCatalog,};
 

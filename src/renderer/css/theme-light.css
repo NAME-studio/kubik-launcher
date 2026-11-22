@@ -109,11 +109,11 @@ html[data-theme="light"] .chat-day span {
 }
 
 html[data-theme="light"] .badge.accent {
-  color: #186b34;
+  color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #3a4553);
 }
 
 html[data-theme="light"] .btn.primary {
-  color: #08120a;
+  color: #ffffff;
 }
 
 html[data-theme="light"] .notice {
@@ -121,7 +121,9 @@ html[data-theme="light"] .notice {
 }
 
 html[data-theme="light"] .friend-code {
-  color: #14713a;
+  color: color-mix(in srgb, rgb(var(--accent-rgb)) 62%, #3a4553);
+  border-color: color-mix(in srgb, rgb(var(--accent-rgb)) 34%, transparent);
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 8%, #ffffff);
 }
 
 html[data-theme="light"] .skeleton {
@@ -185,7 +187,7 @@ html[data-theme="light"] .hero .progress {
 
 html[data-theme="light"] .badge.accent {
   background: rgba(var(--accent-rgb), 0.18);
-  color: #17692f;
+  color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #3a4553);
 }
 
 html[data-theme="light"] .badge.blue {
@@ -211,7 +213,7 @@ html[data-theme="light"] .inst-card.picked .badge.accent,
 html[data-theme="light"] .nav-item.active .nav-badge {
   background: #ffffff;
   border-color: rgba(24, 38, 61, 0.16);
-  color: #17692f;
+  color: color-mix(in srgb, rgb(var(--accent-rgb)) 58%, #3a4553);
 }
 
 html[data-theme="light"] .modal .notice,
@@ -225,4 +227,342 @@ html[data-theme="light"] .toast {
   border-color: var(--border);
   box-shadow: 0 16px 38px rgba(24, 38, 61, 0.16);
   color: var(--text);
+}
+
+/* ============================================================
+   Светлая тема 2.0 — мягче тон, светлее шрифт, меньше контраста
+   ============================================================ */
+html[data-theme="light"] {
+  --bg: #f6f8fc;
+  --bg-2: #eef2f9;
+  --panel: #ffffff;
+  --panel-2: #f7f9fd;
+  --panel-3: #eef2f9;
+  --border: rgba(28, 42, 68, 0.11);
+  --border-soft: rgba(28, 42, 68, 0.07);
+  --border-strong: rgba(28, 42, 68, 0.18);
+  --text: #2b3442;
+  --muted: #5c6878;
+  --muted-2: #8894a6;
+  --shadow: 0 14px 34px rgba(23, 35, 58, 0.09);
+  --shadow-soft: 0 8px 20px rgba(23, 35, 58, 0.06);
+  --surface-tile: #f2f5fb;
+  --surface-tile-2: #e8edf6;
+  --surface-bar: #eef2f9;
+  --surface-ing: #f4f7fc;
+  --surface-code: #f6f8fc;
+  --hover: rgba(28, 42, 68, 0.04);
+  --hover-2: rgba(28, 42, 68, 0.06);
+  --hover-3: rgba(28, 42, 68, 0.09);
+  --accent-text: color-mix(in srgb, var(--accent) 62%, #2b3442);
+  --switch-off: #e3e9f3;
+}
+
+html[data-theme="light"] body {
+  background:
+    radial-gradient(900px 480px at 8% -10%, color-mix(in srgb, rgb(var(--accent-rgb)) 10%, transparent), transparent 62%),
+    radial-gradient(700px 420px at 96% 0%, rgba(120, 160, 255, 0.1), transparent 64%),
+    linear-gradient(180deg, #f7f9fd 0%, #eef2f9 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-weight: 400;
+  letter-spacing: 0.002em;
+}
+
+/* шрифт мягче: меньше жирности на заголовках и кнопках */
+html[data-theme="light"] h1,
+html[data-theme="light"] h2,
+html[data-theme="light"] h3,
+html[data-theme="light"] .card-title,
+html[data-theme="light"] .friends-side-title,
+html[data-theme="light"] .friends-chat-name,
+html[data-theme="light"] .inst-name,
+html[data-theme="light"] .mod-title,
+html[data-theme="light"] .hero h2 {
+  font-weight: 600;
+  color: #232b38;
+}
+html[data-theme="light"] .btn { font-weight: 550; }
+html[data-theme="light"] strong,
+html[data-theme="light"] b { font-weight: 600; }
+html[data-theme="light"] .badge { font-weight: 550; }
+html[data-theme="light"] .tiny,
+html[data-theme="light"] .small,
+html[data-theme="light"] .inst-desc,
+html[data-theme="light"] .mod-desc,
+html[data-theme="light"] .friend-status-line { color: #6c7889; }
+
+/* карточки: белые, с очень мягкой тенью вместо жёсткой рамки */
+html[data-theme="light"] .card {
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 10px 28px rgba(23, 35, 58, 0.07), inset 0 1px 0 #ffffff;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+html[data-theme="light"] .card:hover {
+  border-color: color-mix(in srgb, rgb(var(--accent-rgb)) 28%, rgba(28, 42, 68, 0.12));
+  box-shadow: 0 14px 34px rgba(23, 35, 58, 0.1);
+}
+
+html[data-theme="light"] .sidebar,
+html[data-theme="light"] .topbar,
+html[data-theme="light"] .titlebar {
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(14px) saturate(1.1);
+  border-color: var(--border-soft);
+}
+
+html[data-theme="light"] .input,
+html[data-theme="light"] .select,
+html[data-theme="light"] .textarea {
+  background: #f5f7fc;
+  border-color: var(--border);
+  color: var(--text);
+}
+html[data-theme="light"] .input::placeholder,
+html[data-theme="light"] .textarea::placeholder { color: #9aa5b5; }
+html[data-theme="light"] .input:focus,
+html[data-theme="light"] .select:focus,
+html[data-theme="light"] .textarea:focus {
+  border-color: color-mix(in srgb, rgb(var(--accent-rgb)) 55%, #c9d2e0);
+  box-shadow: 0 0 0 3px color-mix(in srgb, rgb(var(--accent-rgb)) 14%, transparent);
+}
+
+html[data-theme="light"] .btn.ghost {
+  background: #f5f7fc;
+  border-color: var(--border);
+  color: #3a4453;
+}
+html[data-theme="light"] .btn.ghost:hover { background: #eef2f9; color: #232b38; }
+
+html[data-theme="light"] .btn.primary {
+  box-shadow: 0 8px 20px color-mix(in srgb, rgb(var(--accent-rgb)) 26%, transparent);
+}
+
+html[data-theme="light"] .badge {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: var(--border);
+  color: #55616f;
+}
+html[data-theme="light"] .badge.accent {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 16%, #ffffff);
+  color: color-mix(in srgb, rgb(var(--accent-rgb)) 62%, #2b3442);
+  border-color: color-mix(in srgb, rgb(var(--accent-rgb)) 30%, transparent);
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(28, 42, 68, 0.18);
+  border-radius: 999px;
+}
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: rgba(28, 42, 68, 0.28); }
+html[data-theme="light"] ::selection {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 30%, #ffffff);
+  color: #1e2633;
+}
+
+/* ============================================================
+   Светлая 2.1 — мягкие шрифты, приглушённый акцент, светлее обложки
+   ============================================================ */
+html[data-theme="light"] {
+  --text: #3a4553;
+  --muted: #6b7686;
+  --muted-2: #8d98a8;
+  --accent-soft: color-mix(in srgb, rgb(var(--accent-rgb)) 12%, #ffffff);
+}
+
+html[data-theme="light"] h1,
+html[data-theme="light"] h2,
+html[data-theme="light"] h3,
+html[data-theme="light"] .card-title,
+html[data-theme="light"] .friends-side-title,
+html[data-theme="light"] .friends-chat-name,
+html[data-theme="light"] .inst-name,
+html[data-theme="light"] .mod-title,
+html[data-theme="light"] .hero h2 {
+  color: #333d4a;
+  font-weight: 550;
+}
+
+html[data-theme="light"] .small,
+html[data-theme="light"] .tiny,
+html[data-theme="light"] .muted,
+html[data-theme="light"] .inst-desc,
+html[data-theme="light"] .mod-desc,
+html[data-theme="light"] .friend-status-line,
+html[data-theme="light"] .kv span:first-child {
+  color: #77828f;
+}
+
+/* акцент не бьёт по глазам: приглушённые заливки и мягкая кнопка */
+html[data-theme="light"] .btn.primary {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, rgb(var(--accent-rgb)) 78%, #ffffff),
+    color-mix(in srgb, rgb(var(--accent-rgb)) 92%, #ffffff));
+  color: color-mix(in srgb, rgb(var(--accent-rgb)) 30%, #2b3442);
+  box-shadow: 0 6px 16px color-mix(in srgb, rgb(var(--accent-rgb)) 18%, transparent);
+  border-color: color-mix(in srgb, rgb(var(--accent-rgb)) 34%, transparent);
+}
+html[data-theme="light"] .btn.primary:hover {
+  box-shadow: 0 10px 22px color-mix(in srgb, rgb(var(--accent-rgb)) 24%, transparent);
+}
+html[data-theme="light"] .badge.accent {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 10%, #ffffff);
+  color: color-mix(in srgb, rgb(var(--accent-rgb)) 55%, #4a5563);
+  border-color: color-mix(in srgb, rgb(var(--accent-rgb)) 22%, transparent);
+}
+html[data-theme="light"] .nav-item.active,
+html[data-theme="light"] .tab.active {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 9%, #ffffff);
+  color: color-mix(in srgb, rgb(var(--accent-rgb)) 45%, #3a4553);
+}
+
+/* обложки: без чёрных затемнений на светлой теме */
+html[data-theme="light"] .inst-cover::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 40%, rgba(20, 28, 40, 0.35));
+}
+html[data-theme="light"] .cover-shade {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 45%, rgba(20, 28, 40, 0.32));
+}
+html[data-theme="light"] .mod-cover::after {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 45%, rgba(20, 28, 40, 0.3));
+}
+html[data-theme="light"] .inst-cover .cover-icon,
+html[data-theme="light"] .mod-cover .mod-cover-icon {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(28, 42, 68, 0.12);
+  box-shadow: 0 6px 14px rgba(23, 35, 58, 0.18);
+}
+html[data-theme="light"] .inst-cover .badges .badge {
+  background: rgba(255, 255, 255, 0.86);
+  border-color: rgba(28, 42, 68, 0.12);
+  color: #3a4553;
+}
+
+/* никакого просвечивания: шапка и рейл непрозрачные, одна линия по всей ширине */
+html[data-theme="light"] .titlebar,
+html[data-theme="light"] .sidebar,
+html[data-theme="light"] .topbar {
+  background: #ffffff;
+  backdrop-filter: none;
+  border-color: var(--border-soft);
+}
+html[data-theme="light"] .topbar { border-bottom: 1px solid var(--border-soft); }
+html[data-theme="light"] .page-head { border-bottom: 0; }
+html[data-theme="light"] body::before { opacity: 0.22; }
+
+/* ============================================================
+   Светлая 2.2 — убираем акцентную полосу сверху и чиним кнопки
+   ============================================================ */
+html[data-theme="light"] body::before {
+  display: none;
+}
+html[data-theme="light"] body {
+  background:
+    radial-gradient(900px 460px at 8% -10%, rgba(var(--accent-rgb), 0.16), transparent 68%),
+    radial-gradient(760px 420px at 100% 0%, rgba(var(--accent2-rgb), 0.12), transparent 70%),
+    linear-gradient(180deg, #f8fafd 0%, #eef2f9 100%);
+  background-attachment: fixed;
+}
+
+/* главная кнопка: ровная заливка акцентом и белый текст — читается всегда */
+html[data-theme="light"] .btn.primary {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 88%, #ffffff);
+  color: #ffffff;
+  border-color: color-mix(in srgb, rgb(var(--accent-rgb)) 70%, #000000);
+  box-shadow: 0 6px 16px color-mix(in srgb, rgb(var(--accent-rgb)) 26%, transparent);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+}
+html[data-theme="light"] .btn.primary:hover {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 96%, #ffffff);
+  box-shadow: 0 10px 22px color-mix(in srgb, rgb(var(--accent-rgb)) 32%, transparent);
+}
+html[data-theme="light"] .btn.primary .icon { color: #ffffff; }
+
+/* вторичные кнопки не сливаются с фоном */
+html[data-theme="light"] .btn {
+  border-color: rgba(28, 42, 68, 0.14);
+  color: #3a4553;
+}
+
+/* полоса-заголовок без подложки и без линии — свечение не рвётся */
+html[data-theme="light"] .page-head {
+  background: transparent;
+  border-bottom: 0;
+}
+html[data-theme="light"] .nav-item.active {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 12%, #ffffff);
+  color: color-mix(in srgb, rgb(var(--accent-rgb)) 40%, #2b3442);
+}
+
+/* ============================================================
+   Светлая 2.3 — тумблеры, ползунки, карточки и полная ширина
+   ============================================================ */
+html[data-theme="light"] {
+  --switch-off: #e4eaf4;
+  --switch-knob: #ffffff;
+  --surface-bar: #e7edf7;
+}
+
+html[data-theme="light"] .switch {
+  background: var(--switch-off);
+  border-color: rgba(28, 42, 68, 0.12);
+  box-shadow: inset 0 1px 2px rgba(23, 35, 58, 0.08);
+}
+html[data-theme="light"] .switch::after {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(23, 35, 58, 0.25);
+}
+html[data-theme="light"] .switch.on {
+  background: rgb(var(--accent-rgb));
+  border-color: color-mix(in srgb, rgb(var(--accent-rgb)) 70%, #000000);
+}
+html[data-theme="light"] .switch.on::after {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+}
+
+html[data-theme="light"] .slider::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, rgb(var(--accent-rgb)), color-mix(in srgb, rgb(var(--accent-rgb)) 70%, #ffffff)) no-repeat,
+    var(--surface-bar);
+  background-size: calc(18px + (100% - 18px) * var(--ratio, 0.5)) 100%, 100% 100%;
+}
+html[data-theme="light"] .slider::-webkit-slider-thumb {
+  background: #ffffff;
+  border: 2px solid rgb(var(--accent-rgb));
+  box-shadow: 0 2px 6px rgba(23, 35, 58, 0.22);
+}
+
+/* карточки не стерильно-белые и не сливаются с фоном */
+html[data-theme="light"] .card {
+  background: #fdfdff;
+  border-color: rgba(28, 42, 68, 0.1);
+}
+html[data-theme="light"] body {
+  background: linear-gradient(180deg, #f2f5fb 0%, #e9eef7 100%);
+}
+
+/* одиночные вкладки настроек — на всю ширину, без пустой половины */
+html[data-theme="light"] .settings-cols.single,
+.settings-cols.single { grid-template-columns: minmax(0, 1fr); }
+.settings-col { width: 100%; }
+
+/* ============================================================
+   Светлая 2.4 — акцентное свечение в шапке и яркий куб
+   ============================================================ */
+/* шапка: акцентное свечение сверху, как в тёмной теме, но на белом */
+/* шапка прозрачная — свечение идёт от фона страницы, как в тёмной и неоне */
+html[data-theme="light"] .titlebar {
+  background: transparent;
+  border-bottom: 0;
+}
+
+/* куб-логотип светится настоящим акцентом, а не затемнённым --accent-text */
+html[data-theme="light"] .logo-mark stop:first-child {
+  stop-color: var(--accent);
+}
+html[data-theme="light"] .logo-mark stop:last-child {
+  stop-color: var(--accent-2);
+}
+html[data-theme="light"] .tb-logo {
+  filter: drop-shadow(0 4px 10px rgba(var(--accent-rgb), 0.3));
 }

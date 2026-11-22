@@ -92,6 +92,38 @@ async function search({ projectType = 'mod', query = '', gameVersion, loader, in
   return { hits: (data.data || []).map(mapItem), total: (data.pagination && data.pagination.totalCount) || 0 };
 }
 
+const shotCache = new Map();
+
+// Скриншот мода с CurseForge по слагу — для карточек без галереи на Modrinth
+async function screenshotsBySlug(slug, title) {
+  const key = String(slug || '').toLowerCase();
+  if (!key || !hasKey()) return [];
+  const cached = shotCache.get(key);
+  if (cached && Date.now() - cached.time < 10 * 60 * 1000) return cached.data;
+  let shots = [];
+  try {
+    const data = await request('/mods/search', { gameId: GAME_ID, classId: CLASS_IDS.mod, searchFilter: key, pageSize: 1, sortField: 1, sortOrder: 'desc' });
+    let mod = (data.data || [])[0];
+    if (mod && String(mod.slug || '').toLowerCase() !== key) mod = null;
+    if (!mod && title) {
+      const byName = await request('/mods/search', { gameId: GAME_ID, classId: CLASS_IDS.mod, searchFilter: String(title), pageSize: 1, sortField: 1, sortOrder: 'desc' });
+      const candidate = (byName.data || [])[0];
+      if (candidate && String(candidate.name || '').trim().toLowerCase() === String(title).trim().toLowerCase()) mod = candidate;
+    }
+    if (mod) {
+      shots = (mod.screenshots || [])
+        .slice(0, 2)
+        .map((shot) => ({ url: shot.thumbnailUrl || shot.url }))
+        .filter((shot) => shot.url);
+    }
+  } catch {
+    shots = [];
+  }
+  if (shotCache.size > 400) shotCache.clear();
+  shotCache.set(key, { time: Date.now(), data: shots });
+  return shots;
+}
+
 function fileUrl(file) {
   if (file.downloadUrl) return file.downloadUrl;
   const id = String(file.id);
@@ -347,4 +379,4 @@ async function fileByIds(projectId, fileId) {
   return { ...file, downloadUrl: fileUrl(file) };
 }
 
-module.exports = { hasKey, search, details, install, pickFile, installModpack, fileByIds, CLASS_IDS };
+module.exports = { hasKey, search, details, install, pickFile, installModpack, fileByIds, screenshotsBySlug, CLASS_IDS };

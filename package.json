@@ -1,7 +1,7 @@
 {
   "name": "kubik-launcher",
   "productName": "Kubik Launcher",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "Kubik Launcher — лаунчер Minecraft: Ely.by, моды, модпаки, редактор скинов",
   "main": "main.js",
   "author": "Kubik",
@@ -13,7 +13,8 @@
     "dist": "electron-builder --win nsis portable",
     "dist:portable": "electron-builder --win portable",
     "dist:installer": "electron-builder --win nsis",
-    "beta": "electron-builder --win dir && node scripts/beta-shortcut.js"
+    "beta": "electron-builder --win dir && node scripts/beta-shortcut.js",
+    "clean:beta": "node scripts/cleanup-betas.js"
   },
   "devDependencies": {
     "electron": "^38.0.0",

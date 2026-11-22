@@ -901,14 +901,14 @@ body[data-route="skins"] .page-head h1 {
 html[data-theme="light"] body[data-route="versions"] .page-head,
 html[data-theme="light"] body[data-route="skins"] .page-head {
   border-color: rgba(24, 38, 61, 0.12);
-  background-color: #e6edf7;
+  background-color: #cdd9ea;
 }
 
 html[data-theme="light"] body[data-route="versions"] .page-head::after,
 html[data-theme="light"] body[data-route="skins"] .page-head::after {
   background:
-    linear-gradient(90deg, rgba(249, 252, 255, 0.95) 0%, rgba(249, 252, 255, 0.86) 40%, rgba(249, 252, 255, 0.18) 76%, rgba(249, 252, 255, 0.42) 100%),
-    linear-gradient(0deg, rgba(238, 244, 252, 0.35), transparent 62%);
+    linear-gradient(90deg, rgba(247, 250, 255, 0.82) 0%, rgba(247, 250, 255, 0.5) 34%, rgba(247, 250, 255, 0.02) 66%, rgba(247, 250, 255, 0.16) 100%),
+    linear-gradient(0deg, rgba(232, 240, 251, 0.22), transparent 52%);
 }
 
 html[data-theme="light"] body[data-route="versions"] .page-head h1,
@@ -1220,4 +1220,361 @@ html[data-theme="light"] .skin-tile .skin-figure {
 
 .canvas-column .editor-preview-figures canvas {
   height: 92px;
+}
+
+/* Друзья: без пустой полосы под списком */
+.friends-layout { grid-template-rows: minmax(0, auto) minmax(0, 1fr); height: 640px; }
+.friends-layout > .friends-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.friends-layout > .friends-packs-card { max-height: none; min-height: 0; }
+.friends-list { flex: 1 1 auto; min-height: 0; }
+
+/* Друзья: две колонки, вкладки и фильтры */
+.friends-layout {
+  grid-template-columns: 306px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "side chat";
+  height: 640px;
+}
+.friends-layout > .friends-side {
+  grid-area: side;
+  border-right: 1px solid var(--border);
+  border-bottom: 0;
+  padding: 12px 12px 10px;
+}
+.friends-side-head { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.friends-side-title { font-size: 15px; font-weight: 700; flex: 1 1 auto; }
+.friends-seg {
+  display: flex; gap: 4px; padding: 3px; margin: 8px 0;
+  border: 1px solid var(--border-soft); border-radius: 10px; background: var(--panel-2);
+}
+.friends-seg-btn {
+  flex: 1 1 0; min-width: 0; padding: 6px 6px; border: 0; border-radius: 7px;
+  background: transparent; color: var(--muted); font: inherit; font-size: 11.5px; font-weight: 600;
+  cursor: pointer; transition: background .18s ease, color .18s ease;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.friends-seg-btn:hover { color: var(--text); background: var(--hover); }
+.friends-seg-btn.on { background: var(--panel); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+.friends-pane { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; gap: 8px; }
+.friends-filters { display: flex; gap: 4px; }
+.friends-filter {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
+  border: 1px solid var(--border-soft); border-radius: 999px; background: transparent;
+  color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+  transition: color .15s ease, background .15s ease, border-color .15s ease;
+}
+.friends-filter:hover { color: var(--text); border-color: var(--border); }
+.friends-filter.on { color: var(--accent-text); border-color: rgba(var(--accent-rgb), .38); background: rgba(var(--accent-rgb), .1); }
+.friends-filter-badge { font-size: 10px; opacity: .78; }
+.friends-filter-badge.hidden { display: none; }
+.friends-hint { font-size: 11px; color: var(--muted-2); line-height: 1.45; padding: 6px 2px; }
+.friends-chat-avatar {
+  width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--panel-3); color: var(--muted); flex: none;
+}
+.friends-chat-name { font-size: 14px; font-weight: 650; }
+
+/* ============================================================
+   Kubik Neon — тема, которая красится в цвет акцента
+   ============================================================ */
+/* ============================================================
+   Неон 2.0 — единая стеклянная тема
+   ============================================================ */
+html[data-theme="neon"] {
+  --radius: 14px;
+  --neon-glow: color-mix(in srgb, rgb(var(--accent-rgb)) 24%, transparent);
+  --neon-line: color-mix(in srgb, rgb(var(--accent-rgb)) 42%, transparent);
+  --neon-panel: rgba(12, 17, 26, 0.94);
+  --panel: rgba(15, 20, 30, 0.82);
+  --panel-2: color-mix(in srgb, rgb(var(--accent-rgb)) 7%, rgba(20, 26, 38, 0.86));
+  --panel-3: color-mix(in srgb, rgb(var(--accent-rgb)) 11%, rgba(26, 33, 47, 0.88));
+  --border-soft: color-mix(in srgb, rgb(var(--accent-rgb)) 15%, rgba(120, 140, 180, 0.16));
+  --border: color-mix(in srgb, rgb(var(--accent-rgb)) 30%, rgba(130, 150, 190, 0.24));
+  --border-strong: color-mix(in srgb, rgb(var(--accent-rgb)) 50%, rgba(150, 175, 215, 0.3));
+  --surface-tile: rgba(19, 25, 36, 0.88);
+  --surface-tile-2: rgba(12, 17, 26, 0.92);
+  --muted: #97a5b8;
+  --muted-2: #6e7c8e;
+}
+
+html[data-theme="neon"] body {
+  background:
+    radial-gradient(1100px 600px at 4% -16%, color-mix(in srgb, rgb(var(--accent-rgb)) 30%, transparent), transparent 62%),
+    radial-gradient(900px 520px at 100% -8%, color-mix(in srgb, rgb(var(--accent-rgb)) 17%, transparent), transparent 64%),
+    radial-gradient(900px 700px at 50% 116%, color-mix(in srgb, rgb(var(--accent-rgb)) 22%, transparent), transparent 66%),
+    #070a11;
+  background-attachment: fixed;
+}
+
+html[data-theme="neon"] ::selection {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 42%, transparent);
+  color: #fff;
+}
+
+/* шапка, рейл и верхняя полоса — одно стекло с одной линией */
+html[data-theme="neon"] .titlebar,
+html[data-theme="neon"] .sidebar,
+html[data-theme="neon"] .topbar {
+  background: rgba(9, 13, 20, 0.82);
+  backdrop-filter: blur(14px) saturate(1.2);
+  border-color: var(--border-soft);
+}
+html[data-theme="neon"] .titlebar { border-bottom: 1px solid var(--border-soft); }
+html[data-theme="neon"] .sidebar { border-right: 1px solid var(--border-soft); }
+
+html[data-theme="neon"] .nav-item {
+  color: var(--muted);
+  border-radius: 13px;
+}
+html[data-theme="neon"] .nav-item:hover {
+  color: var(--text);
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 10%, rgba(255, 255, 255, 0.02));
+}
+html[data-theme="neon"] .nav-item.active::before { display: none; }
+html[data-theme="neon"] .nav-item.active {
+  color: var(--accent-text);
+  background:
+    linear-gradient(160deg,
+      color-mix(in srgb, rgb(var(--accent-rgb)) 22%, rgba(255, 255, 255, 0.04)),
+      color-mix(in srgb, rgb(var(--accent-rgb)) 8%, rgba(255, 255, 255, 0.01)));
+  border: 1px solid var(--neon-line);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 22px color-mix(in srgb, rgb(var(--accent-rgb)) 26%, transparent);
+}
+
+/* карточки: меньше блюра (это iGPU), больше читаемости */
+html[data-theme="neon"] .card {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, rgb(var(--accent-rgb)) 7%, rgba(21, 27, 39, 0.9)),
+      rgba(11, 16, 24, 0.94));
+  border: 1px solid var(--border-soft);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 14px 32px rgba(2, 4, 9, 0.5);
+  backdrop-filter: blur(8px);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+html[data-theme="neon"] .card:hover {
+  border-color: var(--border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 18px 40px rgba(2, 4, 9, 0.56),
+    0 0 22px var(--neon-glow);
+}
+
+html[data-theme="neon"] .hero {
+  border-radius: 20px;
+  border: 1px solid var(--border-soft);
+  box-shadow:
+    0 24px 56px rgba(2, 4, 9, 0.58),
+    inset 0 0 56px color-mix(in srgb, rgb(var(--accent-rgb)) 10%, transparent);
+}
+html[data-theme="neon"] .hero-bg {
+  background-image:
+    linear-gradient(180deg, rgba(8, 11, 18, 0.1), rgba(8, 11, 18, 0.7)),
+    radial-gradient(700px 380px at 18% 0%, color-mix(in srgb, rgb(var(--accent-rgb)) 24%, transparent), transparent 70%),
+    url('../assets/hero-sky.jpg');
+  background-size: auto, auto, cover;
+  background-position: center, center, center 58%;
+  background-repeat: no-repeat;
+}
+
+/* заголовки страниц с баннером — тёмная подложка под текст */
+html[data-theme="neon"] body[data-route="versions"] .page-head::after,
+html[data-theme="neon"] body[data-route="skins"] .page-head::after {
+  background:
+    linear-gradient(90deg, rgba(6, 10, 16, 0.95) 0%, rgba(6, 10, 16, 0.78) 42%, rgba(6, 10, 16, 0.16) 78%, rgba(6, 10, 16, 0.42) 100%),
+    linear-gradient(0deg, rgba(6, 10, 16, 0.5), transparent 62%);
+}
+
+/* кнопки */
+html[data-theme="neon"] .btn {
+  border-radius: 12px;
+  border-color: var(--border-soft);
+}
+html[data-theme="neon"] .btn.primary {
+  color: #ffffff;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, rgb(var(--accent-rgb)) 92%, #ffffff),
+    color-mix(in srgb, rgb(var(--accent-rgb)) 88%, #000000));
+  border-color: color-mix(in srgb, rgb(var(--accent-rgb)) 60%, #000000);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 10px 22px color-mix(in srgb, rgb(var(--accent-rgb)) 28%, transparent);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.22);
+}
+html[data-theme="neon"] .btn.primary:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 14px 30px color-mix(in srgb, rgb(var(--accent-rgb)) 38%, transparent);
+}
+html[data-theme="neon"] .btn.ghost,
+html[data-theme="neon"] .btn:not(.primary) {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 6%, rgba(255, 255, 255, 0.02));
+  border-color: var(--border-soft);
+}
+html[data-theme="neon"] .btn:not(.primary):hover {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 12%, rgba(255, 255, 255, 0.03));
+  border-color: var(--border);
+}
+
+/* поля */
+html[data-theme="neon"] .input,
+html[data-theme="neon"] .select,
+html[data-theme="neon"] .textarea {
+  background: rgba(9, 14, 22, 0.86);
+  border-color: var(--border-soft);
+  color: var(--text);
+}
+html[data-theme="neon"] .input::placeholder,
+html[data-theme="neon"] .textarea::placeholder { color: var(--muted-2); }
+html[data-theme="neon"] .input:focus,
+html[data-theme="neon"] .select:focus,
+html[data-theme="neon"] .textarea:focus {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, rgb(var(--accent-rgb)) 16%, transparent);
+}
+
+/* вкладки, чипы, строки списков */
+html[data-theme="neon"] .tab,
+html[data-theme="neon"] .chip {
+  border-radius: 10px;
+  border-color: var(--border-soft);
+  background: rgba(12, 17, 26, 0.7);
+}
+html[data-theme="neon"] .tab.active,
+html[data-theme="neon"] .chip.active {
+  color: var(--accent-text);
+  border-color: var(--neon-line);
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 16%, rgba(255, 255, 255, 0.02));
+  box-shadow: 0 0 18px color-mix(in srgb, rgb(var(--accent-rgb)) 22%, transparent);
+}
+html[data-theme="neon"] .vp-row { border-radius: 10px; }
+html[data-theme="neon"] .vp-row:hover { background: rgba(255, 255, 255, 0.04); }
+html[data-theme="neon"] .vp-row.active {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 16%, transparent);
+  color: var(--accent-text);
+}
+
+html[data-theme="neon"] .badge { border-radius: 999px; }
+html[data-theme="neon"] .badge.accent,
+html[data-theme="neon"] .friends-count.live {
+  box-shadow: 0 0 16px color-mix(in srgb, rgb(var(--accent-rgb)) 32%, transparent);
+}
+
+html[data-theme="neon"] .inst-cover,
+html[data-theme="neon"] .mod-cover { border-radius: 12px; }
+html[data-theme="neon"] .inst-card,
+html[data-theme="neon"] .mod-card {
+  border-radius: 16px;
+  border-color: var(--border-soft);
+  box-shadow: 0 14px 30px rgba(2, 4, 9, 0.44);
+}
+html[data-theme="neon"] .inst-card:hover,
+html[data-theme="neon"] .mod-card:hover {
+  border-color: var(--border);
+  box-shadow:
+    0 20px 42px rgba(2, 4, 9, 0.55),
+    0 0 24px var(--neon-glow);
+}
+
+/* модалки и тосты — плотные, чтобы текст не уходил в фон */
+html[data-theme="neon"] .modal,
+html[data-theme="neon"] .toast,
+html[data-theme="neon"] .dropdown {
+  background: var(--neon-panel);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* тумблеры и ползунки */
+html[data-theme="neon"] .switch {
+  border-color: var(--border-soft);
+  background: rgba(255, 255, 255, 0.06);
+}
+html[data-theme="neon"] .switch.on {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, rgb(var(--accent-rgb)) 92%, #ffffff),
+    color-mix(in srgb, rgb(var(--accent-rgb)) 86%, #000000));
+  box-shadow: 0 0 18px color-mix(in srgb, rgb(var(--accent-rgb)) 32%, transparent);
+}
+html[data-theme="neon"] .switch.on::after { background: #ffffff; }
+html[data-theme="neon"] .slider { background: transparent; }
+html[data-theme="neon"] .slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg,
+      color-mix(in srgb, rgb(var(--accent-rgb)) 92%, #ffffff),
+      color-mix(in srgb, rgb(var(--accent-rgb)) 78%, #000000)) no-repeat,
+    rgba(255, 255, 255, 0.09);
+  background-size: calc(18px + (100% - 18px) * var(--ratio, 0.5)) 100%, 100% 100%;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+html[data-theme="neon"] .slider::-webkit-slider-thumb {
+  background: #ffffff;
+  border: 3px solid color-mix(in srgb, rgb(var(--accent-rgb)) 88%, #ffffff);
+  box-shadow: 0 0 14px color-mix(in srgb, rgb(var(--accent-rgb)) 40%, transparent);
+}
+
+html[data-theme="neon"] .friends-layout {
+  border-radius: 20px;
+  border-color: var(--border-soft);
+  box-shadow:
+    0 22px 52px rgba(2, 4, 9, 0.52),
+    inset 0 0 36px color-mix(in srgb, rgb(var(--accent-rgb)) 7%, transparent);
+}
+
+html[data-theme="neon"] ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 30%, rgba(120, 140, 180, 0.3));
+  border-radius: 999px;
+}
+html[data-theme="neon"] ::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, rgb(var(--accent-rgb)) 48%, rgba(120, 140, 180, 0.36));
+}
+
+.version-types {
+  margin: 10px 0 4px;
+  flex-wrap: wrap;
+}
+
+.version-types .tab {
+  font-size: 12px;
+  padding: 5px 12px;
+}
+
+.version-types .tab:not(.active) {
+  opacity: 0.55;
+}
+
+html[data-theme="light"] .version-types .tab:not(.active) {
+  background: #ffffff;
+  color: var(--muted);
+}
+
+/* подсказка рейла поверх контента, без обрезки и без второй отрисовки */
+.sidebar { position: relative; z-index: 30; overflow: visible; }
+.nav-item { position: relative; }
+.nav-item::after {
+  z-index: 400;
+  background: var(--panel-3);
+  backdrop-filter: none;
+  pointer-events: none;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+}
+.nav-item:hover { z-index: 401; }
+html[data-theme="light"] .nav-item::after {
+  background: #ffffff;
+  border-color: rgba(28, 42, 68, 0.14);
+  box-shadow: 0 8px 22px rgba(23, 35, 58, 0.16);
+  color: #3a4553;
 }

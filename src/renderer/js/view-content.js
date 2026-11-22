@@ -33,6 +33,7 @@ window.Views.contentView = (config) => {
     installState: {},
     installNodes: new Map(),
     installedIds: new Set(),
+    installedTitles: new Set(),
     observer: null,
     curseHasKey: null,
     lastError: null,
@@ -128,6 +129,40 @@ window.Views.contentView = (config) => {
     }
   }
 
+  function normName(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/[^a-zа-яё0-9]+/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function compactName(value) {
+    return normName(value).replace(/[^a-zа-яё]/gi, '');
+  }
+
+  function rememberTitle(value) {
+    const name = normName(value);
+    if (name.length < 5) return;
+    s.installedTitles.add(name);
+    const compact = compactName(value);
+    if (compact.length >= 5) s.installedTitles.add(compact);
+  }
+
+  function isInstalled(item) {
+    if (!item) return false;
+    if (s.installedIds.has(item.id)) return true;
+    const target = normName(item.title);
+    if (target.length < 5) return false;
+    const compact = compactName(item.title);
+    for (const name of s.installedTitles) {
+      if (name === target || name === compact) return true;
+      const long = name.length >= 10 && (compact.length >= 10);
+      if (long && (name === compact || name.includes(compact) || compact.includes(name))) return true;
+    }
+    return false;
+  }
+
   async function refreshInstalled() {
     const instance = currentInstance();
     s.installedIds = new Set();
@@ -138,7 +173,16 @@ window.Views.contentView = (config) => {
     try {
       const data = await UI.req(window.api.content.installed(instance.id));
       s.installed = data;
-      for (const item of data.items || []) s.installedIds.add(item.projectId);
+      s.installedTitles = new Set();
+      for (const item of data.items || []) {
+        s.installedIds.add(item.projectId);
+        rememberTitle(item.title);
+        rememberTitle(item.slug);
+      }
+      for (const item of data.manual || []) {
+        rememberTitle(item.title);
+        rememberTitle(String(item.filename || '').replace(/\.(jar|zip|disabled)$/gi, ''));
+      }
       if (config.type === 'resourcepack') {
         s.packOrder = await UI.req(window.api.packs.list(instance.id)).catch(() => []);
       }
@@ -270,10 +314,17 @@ window.Views.contentView = (config) => {
   }
 
   function modCard(item) {
-    const installed = s.installedIds.has(item.id);
-    const icon = item.icon
-      ? UI.el('img', { class: 'mod-icon', src: item.icon, loading: 'lazy', decoding: 'async', alt: '' })
-      : iconPlaceholder();
+    const installed = isInstalled(item);
+    const shot = item.gallery && item.gallery[0] && item.gallery[0].url;
+    const cover = UI.el('div', {
+      class: 'mod-cover',
+      style: { backgroundImage: `url("${shot || UI.coverBySeed(item.id || item.slug || item.title)}")` },
+    });
+    cover.append(
+      item.icon
+        ? UI.el('img', { class: 'mod-cover-icon', src: item.icon, loading: 'lazy', decoding: 'async', alt: '' })
+        : iconPlaceholder(),
+    );
 
     const downloadBtn = UI.el(
       'button',
@@ -285,7 +336,7 @@ window.Views.contentView = (config) => {
     const card = UI.el(
       'div',
       { class: 'mod-card', tabindex: '0', onclick: () => openItem(item) },
-      icon,
+      cover,
       UI.el(
         'div',
         { class: 'mod-main' },

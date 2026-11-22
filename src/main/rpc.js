@@ -17,21 +17,34 @@ function settings() {
   return store.getSettings();
 }
 
+const SITE_URL = 'https://name-studio.github.io/kubik-launcher/';
+const DOWNLOAD_URL = 'https://github.com/NAME-studio/kubik-launcher/releases/latest';
+const DISCORD_URL = 'https://discord.gg/VCemrH6M44';
+
+function buttonsFor() {
+  return [
+    { label: 'Скачать', url: DOWNLOAD_URL },
+    { label: 'Discord', url: DISCORD_URL },
+  ];
+}
+
 function activityFor(activity) {
   if (!activity) {
-    return { details: 'В лаунчере', state: 'Выбирает сборку', timestamps: { start: Date.now() } };
+    return { details: 'В лаунчере', state: 'Выбирает сборку', timestamps: { start: Date.now() }, buttons: buttonsFor() };
   }
   if (activity.state === 'game') {
     return {
       details: `Играет: ${activity.instanceName || 'Minecraft'}`,
       state: activity.server ? `Сервер: ${activity.server}` : 'Одиночная игра',
       timestamps: { start: activity.startedAt || Date.now() },
+      buttons: buttonsFor(),
     };
   }
   return {
     details: 'В лаунчере',
     state: activity.page ? `Раздел: ${activity.page}` : 'Выбирает сборку',
     timestamps: { start: Date.now() },
+    buttons: buttonsFor(),
   };
 }
 
